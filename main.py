@@ -1,7 +1,9 @@
 import pygame
 from world.npc import NPC
-from engine.llm_client import generate_npc_response
+from engine.llm_client import generate_npc_response,warmup_model
 import threading
+
+from ui.utils import wrap_text
 
 pygame.init()
 
@@ -39,6 +41,12 @@ def fetch_npc_response(npc):
     global npc_response, is_waiting_for_llm
     npc_response = generate_npc_response(npc.name, npc.personality)
     is_waiting_for_llm = False
+
+# Pre-Loading the model so the responses are quicker
+threading.Thread(
+    target=warmup_model,
+    daemon=True
+).start()
 
 while running:
 
@@ -100,35 +108,45 @@ while running:
                             args=(active_npc,),
                             daemon=True
                         ).start()
-                        
+
             elif event.key == pygame.K_ESCAPE:
                 in_dialogue = False
                 active_npc = None
         
     if in_dialogue and active_npc is not None:
 
+        # Dialogue Box Dimensions
         panel_height = 150
-        panel_rect = pygame.Rect(
-            0,
-            HEIGHT - panel_height,
-            WIDTH,
-            panel_height
-        )
+        panel_width = WIDTH
+        panel_x = 0
+        panel_y = HEIGHT - panel_height
+        
+        padding = 20
+        text_max_width = panel_width - 2 * padding
+
+        # Drawing the dialogue box
+        panel_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
+
         pygame.draw.rect(screen, (20, 20, 20), panel_rect)
         pygame.draw.rect(screen, (200, 200, 200), panel_rect, 2)
 
         name_text = font.render(active_npc.name, True, (255, 255, 255))
         
         if is_waiting_for_llm:
-            dialogue_line = "Thinking..."
+            dialogue_lines = ["Thinking..."]
         elif npc_response is not None:
-            dialogue_line = npc_response
+            dialogue_lines = wrap_text(npc_response, font, text_max_width)
         else:
-            dialogue_line = active_npc.static_dialogue[dialogue_index]
+            dialogue_lines = active_npc.static_dialogue
 
-        dialogue_surface = font.render(dialogue_line, True, (255, 255, 255))
+        # Displaying NPC name and Dialogue
         screen.blit(name_text, (20, HEIGHT - 140))
-        screen.blit(dialogue_surface, (20, HEIGHT - 110))
+
+        y_offset = panel_y + padding + 30
+        for line in dialogue_lines:
+            line_surface = font.render(line, True, (255, 255, 255))
+            screen.blit(line_surface, (panel_x + padding, y_offset))
+            y_offset += font.get_height() + 5
 
     pygame.display.flip()
     clock.tick(60)

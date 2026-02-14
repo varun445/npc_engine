@@ -23,3 +23,10 @@ def generate_npc_response(name, personality):
 
     return query_llm(prompt)
 
+def warmup_model():
+    try:
+        query_llm("Hello")
+    except Exception:
+        pass
+
+
