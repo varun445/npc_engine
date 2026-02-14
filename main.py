@@ -1,4 +1,5 @@
 import pygame
+from world.npc import NPC
 
 pygame.init()
 
@@ -15,7 +16,40 @@ player_col = COLS // 2
 running = True
 clock = pygame.time.Clock()
 
+# NPC instantiation
+
+npcs = [NPC("gundalf", 0, 0, (0,255,0), 5), NPC("bob",19,19, (255,0,0), 5), NPC("alex",19,0,(0,0,255),5)]
+
 while running:
+
+    screen.fill((30, 30, 30))
+
+    interactable_npcs = []
+    for npc in npcs:
+        dx = abs(player_row - npc.row)
+        dy = abs(player_col - npc.col)
+        distance = dx + dy
+
+        if distance <= npc.interaction_range:
+            interactable_npcs.append(npc)
+
+    for npc in npcs:
+        npc_x = npc.col * CELL_SIZE
+        npc_y = npc.row * CELL_SIZE
+        pygame.draw.rect(screen, npc.color, (npc_x,npc_y,CELL_SIZE,CELL_SIZE))
+
+        if npc in interactable_npcs:
+            pygame.draw.rect(
+            screen,
+            (255, 255, 0),  # yellow highlight
+            (npc_x, npc_y, CELL_SIZE, CELL_SIZE),
+            3  # border thickness
+        )
+
+    player_x = player_col * CELL_SIZE
+    player_y = player_row * CELL_SIZE
+    pygame.draw.rect(screen, (255, 255, 255), (player_x, player_y, CELL_SIZE, CELL_SIZE))
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -29,14 +63,6 @@ while running:
             elif event.key == pygame.K_RIGHT and player_col < COLS -1:
                 player_col += 1
     
-
-
-    screen.fill((30, 30, 30))
-
-    player_x = player_col * CELL_SIZE
-    player_y = player_row * CELL_SIZE
-    pygame.draw.rect(screen, (255, 255, 255), (player_x, player_y, CELL_SIZE, CELL_SIZE))
-
     pygame.display.flip()
     clock.tick(60)
 
