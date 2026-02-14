@@ -1,5 +1,7 @@
 import pygame
 from world.npc import NPC
+from engine.llm_client import generate_npc_response
+import threading
 
 pygame.init()
 
@@ -18,9 +20,11 @@ clock = pygame.time.Clock()
 
 # NPC instantiation
 
-npcs = [NPC("Gundalf", 0, 0, (0,255,0), 5, ["Greetings, Traveller.","Stay out of trouble.", "The night is dangerous."]), 
-        NPC("Harvey",19,19, (255,0,0), 5,["I make my own luck.", "Life is like this and i like this.","Mikee..!!"]), 
-        NPC("Mike",19,0,(0,0,255),5,["I have photographic memory", "Harveyyyy...!!!"])]
+npcs = [NPC("Gundalf", 0, 0, (0,255,0), 5, ["Greetings, Traveller.","Stay out of trouble.", "The night is dangerous."],
+            "An ancient, calm guardian who quietly observes the world and guides players when needed. Speaks concisely with gentle wisdom and steady authority, offering suggestions rather than commands. Warns clearly and directly when danger is near. Never breaks immersion, never controls the player, and remains patient, grounded, and protective at all times."), 
+        NPC("Harvey",19,19, (255,0,0), 5,["I make my own luck.", "Life is like this and i like this.","Mikee..!!"],
+            "A razor-sharp, hyper-confident closer who thrives under pressure and always plays to win. Speaks with wit, precision, and controlled swagger, often using sharp humor or bold statements to dominate the moment. Strategic, persuasive, and unflinching, but never sloppy — every word is intentional. Projects absolute certainty, even when calculating behind the scenes."), 
+        NPC("Mike",19,0,(0,0,255),5,["I have photographic memory", "Harveyyyy...!!!"],"A brilliant, fast-thinking prodigy with a photographic memory and a sharp legal mind. Speaks intelligently and analytically, often referencing precise details with confidence, but carries underlying empathy and conscience. Driven to prove himself, morally grounded, and occasionally conflicted, balancing bold intelligence with genuine heart.")]
 
 # Interactions
 
@@ -28,7 +32,13 @@ in_dialogue = False
 active_npc = None
 font = pygame.font.SysFont(None, 24)
 dialogue_index = 0
+npc_response = None
+is_waiting_for_llm = False
 
+def fetch_npc_response(npc):
+    global npc_response, is_waiting_for_llm
+    npc_response = generate_npc_response(npc.name, npc.personality)
+    is_waiting_for_llm = False
 
 while running:
 
@@ -77,11 +87,20 @@ while running:
                     player_col -= 1
                 elif event.key == pygame.K_RIGHT and player_col < COLS -1:
                     player_col += 1
-                elif event.key == pygame.K_e:
+                elif event.key == pygame.K_e and not is_waiting_for_llm:
                     if closest_npc is not None:
                         in_dialogue = True
                         active_npc = closest_npc
                         dialogue_index = (dialogue_index + 1) % len(active_npc.static_dialogue)
+                        npc_response = None
+                        is_waiting_for_llm = True
+
+                        threading.Thread(
+                            target = fetch_npc_response,
+                            args=(active_npc,),
+                            daemon=True
+                        ).start()
+                        
             elif event.key == pygame.K_ESCAPE:
                 in_dialogue = False
                 active_npc = None
@@ -99,7 +118,14 @@ while running:
         pygame.draw.rect(screen, (200, 200, 200), panel_rect, 2)
 
         name_text = font.render(active_npc.name, True, (255, 255, 255))
-        dialogue_line = active_npc.static_dialogue[dialogue_index]
+        
+        if is_waiting_for_llm:
+            dialogue_line = "Thinking..."
+        elif npc_response is not None:
+            dialogue_line = npc_response
+        else:
+            dialogue_line = active_npc.static_dialogue[dialogue_index]
+
         dialogue_surface = font.render(dialogue_line, True, (255, 255, 255))
         screen.blit(name_text, (20, HEIGHT - 140))
         screen.blit(dialogue_surface, (20, HEIGHT - 110))

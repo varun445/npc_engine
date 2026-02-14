@@ -1,3 +1,5 @@
+import requests
+
 def query_llm(prompt):
     try:
         response = requests.post(
@@ -11,4 +13,13 @@ def query_llm(prompt):
         return response.json()["response"]
     except Exception as e:
         return f"[LLM Error: {e}]"
+
+def generate_npc_response(name, personality):
+    prompt = (
+        f"You are an NPC named {name}.\n"
+        f"Personality: {personality}\n\n"
+        "Respond to the player in one or two sentences."
+    )
+
+    return query_llm(prompt)
 
