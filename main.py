@@ -25,6 +25,8 @@ while running:
     screen.fill((30, 30, 30))
 
     interactable_npcs = []
+    closest_npc = None
+    min_distance = float("inf")
     for npc in npcs:
         dx = abs(player_row - npc.row)
         dy = abs(player_col - npc.col)
@@ -32,6 +34,8 @@ while running:
 
         if distance <= npc.interaction_range:
             interactable_npcs.append(npc)
+            if distance < min_distance:
+                closest_npc = npc
 
     for npc in npcs:
         npc_x = npc.col * CELL_SIZE
@@ -62,6 +66,10 @@ while running:
                 player_col -= 1
             elif event.key == pygame.K_RIGHT and player_col < COLS -1:
                 player_col += 1
+            elif event.key == pygame.K_e:
+                if closest_npc is not None:
+                     print(f"Interacting with NPC: {closest_npc.name}")
+
     
     pygame.display.flip()
     clock.tick(60)
