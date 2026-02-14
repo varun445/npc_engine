@@ -18,7 +18,17 @@ clock = pygame.time.Clock()
 
 # NPC instantiation
 
-npcs = [NPC("gundalf", 0, 0, (0,255,0), 5), NPC("bob",19,19, (255,0,0), 5), NPC("alex",19,0,(0,0,255),5)]
+npcs = [NPC("Gundalf", 0, 0, (0,255,0), 5, ["Greetings, Traveller.","Stay out of trouble.", "The night is dangerous."]), 
+        NPC("Harvey",19,19, (255,0,0), 5,["I make my own luck.", "Life is like this and i like this.","Mikee..!!"]), 
+        NPC("Mike",19,0,(0,0,255),5,["I have photographic memory", "Harveyyyy...!!!"])]
+
+# Interactions
+
+in_dialogue = False
+active_npc = None
+font = pygame.font.SysFont(None, 24)
+dialogue_index = 0
+
 
 while running:
 
@@ -58,19 +68,42 @@ while running:
         if event.type == pygame.QUIT:
             running = False
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_UP and player_row > 0:
-                player_row -= 1
-            elif event.key == pygame.K_DOWN and player_row < ROWS-1:
-                player_row += 1
-            elif event.key == pygame.K_LEFT and player_col > 0:
-                player_col -= 1
-            elif event.key == pygame.K_RIGHT and player_col < COLS -1:
-                player_col += 1
-            elif event.key == pygame.K_e:
-                if closest_npc is not None:
-                     print(f"Interacting with NPC: {closest_npc.name}")
+            if not in_dialogue:
+                if event.key == pygame.K_UP and player_row > 0:
+                    player_row -= 1
+                elif event.key == pygame.K_DOWN and player_row < ROWS-1:
+                    player_row += 1
+                elif event.key == pygame.K_LEFT and player_col > 0:
+                    player_col -= 1
+                elif event.key == pygame.K_RIGHT and player_col < COLS -1:
+                    player_col += 1
+                elif event.key == pygame.K_e:
+                    if closest_npc is not None:
+                        in_dialogue = True
+                        active_npc = closest_npc
+                        dialogue_index = (dialogue_index + 1) % len(active_npc.static_dialogue)
+            elif event.key == pygame.K_ESCAPE:
+                in_dialogue = False
+                active_npc = None
+        
+    if in_dialogue and active_npc is not None:
 
-    
+        panel_height = 150
+        panel_rect = pygame.Rect(
+            0,
+            HEIGHT - panel_height,
+            WIDTH,
+            panel_height
+        )
+        pygame.draw.rect(screen, (20, 20, 20), panel_rect)
+        pygame.draw.rect(screen, (200, 200, 200), panel_rect, 2)
+
+        name_text = font.render(active_npc.name, True, (255, 255, 255))
+        dialogue_line = active_npc.static_dialogue[dialogue_index]
+        dialogue_surface = font.render(dialogue_line, True, (255, 255, 255))
+        screen.blit(name_text, (20, HEIGHT - 140))
+        screen.blit(dialogue_surface, (20, HEIGHT - 110))
+
     pygame.display.flip()
     clock.tick(60)
 
