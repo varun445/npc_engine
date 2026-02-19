@@ -7,3 +7,4 @@ class NPC:
         self.interaction_range = interaction_range
         self.static_dialogue = static_dialogue
         self.personality = personality
+        self.memory = []

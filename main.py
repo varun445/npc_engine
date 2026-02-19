@@ -20,16 +20,21 @@ player_col = COLS // 2
 running = True
 clock = pygame.time.Clock()
 
-# NPC instantiation
+world_state = {
+    "time_of_day": "day",
+    "player_reputation": "neutral"
+}
 
+# NPC instantiation
 npcs = [NPC("Gundalf", 0, 0, (0,255,0), 5, ["Greetings, Traveller.","Stay out of trouble.", "The night is dangerous."],
             "An ancient, calm guardian who quietly observes the world and guides players when needed. Speaks concisely with gentle wisdom and steady authority, offering suggestions rather than commands. Warns clearly and directly when danger is near. Never breaks immersion, never controls the player, and remains patient, grounded, and protective at all times."), 
         NPC("Harvey",19,19, (255,0,0), 5,["I make my own luck.", "Life is like this and i like this.","Mikee..!!"],
             "A razor-sharp, hyper-confident closer who thrives under pressure and always plays to win. Speaks with wit, precision, and controlled swagger, often using sharp humor or bold statements to dominate the moment. Strategic, persuasive, and unflinching, but never sloppy — every word is intentional. Projects absolute certainty, even when calculating behind the scenes."), 
         NPC("Mike",19,0,(0,0,255),5,["I have photographic memory", "Harveyyyy...!!!"],"A brilliant, fast-thinking prodigy with a photographic memory and a sharp legal mind. Speaks intelligently and analytically, often referencing precise details with confidence, but carries underlying empathy and conscience. Driven to prove himself, morally grounded, and occasionally conflicted, balancing bold intelligence with genuine heart.")]
 
-# Interactions
 
+# NPC Interactions
+MAX_MEMORY_TURNS = 5
 in_dialogue = False
 active_npc = None
 font = pygame.font.SysFont(None, 24)
@@ -39,7 +44,7 @@ is_waiting_for_llm = False
 
 def fetch_npc_response(npc):
     global npc_response, is_waiting_for_llm
-    npc_response = generate_npc_response(npc.name, npc.personality)
+    npc_response = generate_npc_response(npc.name, npc.personality, world_state, npc.memory)
     is_waiting_for_llm = False
 
 # Pre-Loading the model so the responses are quicker
@@ -108,6 +113,36 @@ while running:
                             args=(active_npc,),
                             daemon=True
                         ).start()
+
+                        if not is_waiting_for_llm:
+                            # adding player turn (for now, generic)
+                            active_npc.memory.append({
+                                "role": "player",
+                                "content": "The player interacted with you."
+                            })
+
+                            # adding npc response
+                            active_npc.memory.append({
+                                "role": "npc",
+                                "content": npc_response
+                            })
+
+                            # trimming memory
+                            if len(active_npc.memory) > MAX_MEMORY_TURNS * 2:
+                                active_npc.memory = active_npc.memory[-MAX_MEMORY_TURNS * 2:]
+
+                elif event.key == pygame.K_t:
+                    world_state["time_of_day"] = (
+                        "night" if world_state["time_of_day"] == "day" else "day"
+                    )
+
+                elif event.key == pygame.K_r:
+                    if world_state["player_reputation"] == "neutral":
+                        world_state["player_reputation"] = "bad"
+                    elif world_state["player_reputation"] == "bad":
+                        world_state["player_reputation"] = "good"
+                    else:
+                        world_state["player_reputation"] = "neutral"
 
             elif event.key == pygame.K_ESCAPE:
                 in_dialogue = False
