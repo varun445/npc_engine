@@ -2,6 +2,7 @@ import pygame
 from world.npc import NPC
 from engine.llm_client import generate_npc_response,warmup_model
 import threading
+from engine.llm_client import categorize_products
 
 from ui.utils import wrap_text
 
@@ -44,14 +45,64 @@ is_waiting_for_llm = False
 
 def fetch_npc_response(npc):
     global npc_response, is_waiting_for_llm
-    npc_response = generate_npc_response(npc.name, npc.personality, world_state, npc.memory)
+    # npc_response = generate_npc_response(npc.name, npc.personality, world_state, npc.memory)
+    npc_response = build_store_response(validated_products,store_layout)
     is_waiting_for_llm = False
 
 # Pre-Loading the model so the responses are quicker
-threading.Thread(
-    target=warmup_model,
-    daemon=True
-).start()
+# threading.Thread(
+#     target=warmup_model,
+#     daemon=True
+# ).start()
+
+# Store Logic
+store_layout = {
+    "dairy": 3,
+    "bakery": 1,
+    "fruits": 2,
+    "vegetables": 2,
+    "beverages": 4,
+    "snacks": 5
+}
+
+def validate_products(llm_result, store_layout):
+    validated = []
+
+    for item in llm_result.get("products", []):
+        name = item.get("name", "").lower()
+        category = item.get("category", "unknown").lower()
+
+        if category in store_layout:
+            validated.append({
+                "name": name,
+                "category": category,
+                "valid": True
+            })
+        else:
+            validated.append({
+                "name": name,
+                "category": "unknown",
+                "valid": False
+            })
+
+    return validated
+
+
+def build_store_response(validated_products, store_layout):
+    responses = []
+
+    for item in validated_products:
+        if item["valid"]:
+            aisle = store_layout[item["category"]]
+            responses.append(
+                f"{item['name'].capitalize()} is in aisle {aisle}."
+            )
+        else:
+            responses.append(
+                f"Sorry, we do not have {item['name']}."
+            )
+
+    return " ".join(responses)
 
 while running:
 
@@ -102,6 +153,9 @@ while running:
                     player_col += 1
                 elif event.key == pygame.K_e and not is_waiting_for_llm:
                     if closest_npc is not None:
+                        player_query = "Where can I find milk and bread?"
+                        llm_result = categorize_products(player_query)
+                        validated_products = validate_products(llm_result, store_layout)
                         in_dialogue = True
                         active_npc = closest_npc
                         dialogue_index = (dialogue_index + 1) % len(active_npc.static_dialogue)

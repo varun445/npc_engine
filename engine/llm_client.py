@@ -1,4 +1,5 @@
 import requests
+DEBUG_LLM = True
 
 def query_llm(prompt):
     try:
@@ -10,6 +11,10 @@ def query_llm(prompt):
                 "stream": False
             }
         )
+        if DEBUG_LLM:
+            print(prompt)
+            print("\n")
+            print(response)
         return response.json()["response"]
     except Exception as e:
         return f"[LLM Error: {e}]"
@@ -38,5 +43,43 @@ def warmup_model():
         query_llm("Hello")
     except Exception:
         pass
+
+import json
+
+def categorize_products(user_query):
+    prompt = f"""
+    You are a grocery store assistant.
+
+    From the user query below, extract the products mentioned
+    and assign each one to a grocery category.
+
+    Valid categories:
+    - dairy
+    - bakery
+    - fruits
+    - vegetables
+    - beverages
+    - snacks
+
+    If you are unsure, use "unknown".
+
+    Return ONLY valid JSON in the following format:
+
+    {{
+    "products": [
+        {{ "name": "<product_name>", "category": "<category>" }}
+    ]
+    }}
+
+    User query:
+    "{user_query}"
+    """
+
+    response = query_llm(prompt)
+
+    try:
+        return json.loads(response)
+    except json.JSONDecodeError:
+        return {"products": []}
 
 
