@@ -1,16 +1,21 @@
 import pygame
-from world.npc import NPC
-from engine.llm_client import generate_npc_response,warmup_model
+from world.npc import ShopAssistant
+from engine.llm_client import (
+    generate_shop_assistant_response, 
+    detect_customer_intent,
+    find_products_in_inventory,
+    warmup_model
+)
+from models.inventory import Inventory
 import threading
-from engine.llm_client import categorize_products
-
+import random
 from ui.utils import wrap_text
 
 pygame.init()
 
 WIDTH, HEIGHT = 800, 800
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("AI NPC Engine")
+pygame.display.set_caption("Shop Assistant - NPC Engine")
 
 CELL_SIZE = 40
 ROWS = HEIGHT // CELL_SIZE
@@ -21,17 +26,24 @@ player_col = COLS // 2
 running = True
 clock = pygame.time.Clock()
 
+# Initialize inventory
+inventory = Inventory()
+
 world_state = {
-    "time_of_day": "day",
-    "player_reputation": "neutral"
+    "store_busy": False,
+    "current_time": "day"
 }
 
-# NPC instantiation
-npcs = [NPC("Gundalf", 0, 0, (0,255,0), 5, ["Greetings, Traveller.","Stay out of trouble.", "The night is dangerous."],
-            "An ancient, calm guardian who quietly observes the world and guides players when needed. Speaks concisely with gentle wisdom and steady authority, offering suggestions rather than commands. Warns clearly and directly when danger is near. Never breaks immersion, never controls the player, and remains patient, grounded, and protective at all times."), 
-        NPC("Harvey",19,19, (255,0,0), 5,["I make my own luck.", "Life is like this and i like this.","Mikee..!!"],
-            "A razor-sharp, hyper-confident closer who thrives under pressure and always plays to win. Speaks with wit, precision, and controlled swagger, often using sharp humor or bold statements to dominate the moment. Strategic, persuasive, and unflinching, but never sloppy — every word is intentional. Projects absolute certainty, even when calculating behind the scenes."), 
-        NPC("Mike",19,0,(0,0,255),5,["I have photographic memory", "Harveyyyy...!!!"],"A brilliant, fast-thinking prodigy with a photographic memory and a sharp legal mind. Speaks intelligently and analytically, often referencing precise details with confidence, but carries underlying empathy and conscience. Driven to prove himself, morally grounded, and occasionally conflicted, balancing bold intelligence with genuine heart.")]
+# Shop Assistant instantiation
+shop_assistant = ShopAssistant(
+    name="Alex",
+    row=0,
+    col=0,
+    color=(0, 200, 100),
+    interaction_range=5,
+    inventory=inventory
+)
+npcs = [shop_assistant]  # Keep NPCs list for compatibility with movement logic
 
 
 # NPC Interactions
@@ -42,11 +54,30 @@ font = pygame.font.SysFont(None, 24)
 dialogue_index = 0
 npc_response = None
 is_waiting_for_llm = False
+customer_query = None
+in_text_input = False
+player_input_text = ""
+show_npc_response = False
 
-def fetch_npc_response(npc):
+def fetch_npc_response(npc, query):
     global npc_response, is_waiting_for_llm
-    # npc_response = generate_npc_response(npc.name, npc.personality, world_state, npc.memory)
-    npc_response = build_store_response(validated_products,store_layout)
+    
+    # Prepare inventory info for the LLM
+    inventory_summary = "Available products: "
+    product_list = []
+    for category, products in inventory.products.items():
+        for product in products:
+            if product["stock"] > 0:
+                product_list.append(f"{product['name']} (${product['price']:.2f}, Aisle {inventory.aisles[category]})")
+    inventory_summary += " | ".join(product_list[:10])  # Limit for context
+    
+    # Generate response using shop assistant prompt
+    npc_response = generate_shop_assistant_response(
+        npc.name, 
+        query, 
+        inventory_summary,
+        npc.memory
+    )
     is_waiting_for_llm = False
 
 # Pre-Loading the model so the responses are quicker
@@ -54,55 +85,6 @@ def fetch_npc_response(npc):
 #     target=warmup_model,
 #     daemon=True
 # ).start()
-
-# Store Logic
-store_layout = {
-    "dairy": 3,
-    "bakery": 1,
-    "fruits": 2,
-    "vegetables": 2,
-    "beverages": 4,
-    "snacks": 5
-}
-
-def validate_products(llm_result, store_layout):
-    validated = []
-
-    for item in llm_result.get("products", []):
-        name = item.get("name", "").lower()
-        category = item.get("category", "unknown").lower()
-
-        if category in store_layout:
-            validated.append({
-                "name": name,
-                "category": category,
-                "valid": True
-            })
-        else:
-            validated.append({
-                "name": name,
-                "category": "unknown",
-                "valid": False
-            })
-
-    return validated
-
-
-def build_store_response(validated_products, store_layout):
-    responses = []
-
-    for item in validated_products:
-        if item["valid"]:
-            aisle = store_layout[item["category"]]
-            responses.append(
-                f"{item['name'].capitalize()} is in aisle {aisle}."
-            )
-        else:
-            responses.append(
-                f"Sorry, we do not have {item['name']}."
-            )
-
-    return " ".join(responses)
 
 while running:
 
@@ -142,7 +124,62 @@ while running:
         if event.type == pygame.QUIT:
             running = False
         if event.type == pygame.KEYDOWN:
-            if not in_dialogue:
+            if in_text_input:
+                # Text input mode
+                if event.key == pygame.K_RETURN:
+                    if player_input_text.strip():
+                        customer_query = player_input_text
+                        in_text_input = False
+                        npc_response = None
+                        show_npc_response = False
+                        is_waiting_for_llm = True
+
+                        threading.Thread(
+                            target=fetch_npc_response,
+                            args=(active_npc, customer_query),
+                            daemon=True
+                        ).start()
+                        
+                        # Add to memory
+                        if active_npc:
+                            active_npc.memory.append({
+                                "role": "customer",
+                                "content": customer_query
+                            })
+                
+                elif event.key == pygame.K_ESCAPE:
+                    in_text_input = False
+                    player_input_text = ""
+                    in_dialogue = False
+                    active_npc = None
+                    customer_query = None
+                
+                elif event.key == pygame.K_BACKSPACE:
+                    player_input_text = player_input_text[:-1]
+                
+                elif event.unicode.isprintable():
+                    if len(player_input_text) < 100:  # Max input length
+                        player_input_text += event.unicode
+            
+            elif in_dialogue and not in_text_input:
+                # In dialogue but not typing - waiting for assistance or continuing
+                if event.key == pygame.K_RETURN:
+                    # Reset for next message
+                    player_input_text = ""
+                    in_text_input = True
+                    npc_response = None
+                    customer_query = None
+                    show_npc_response = False
+                
+                elif event.key == pygame.K_ESCAPE:
+                    in_dialogue = False
+                    in_text_input = False
+                    player_input_text = ""
+                    active_npc = None
+                    customer_query = None
+                    npc_response = None
+            
+            elif not in_dialogue:
                 if event.key == pygame.K_UP and player_row > 0:
                     player_row -= 1
                 elif event.key == pygame.K_DOWN and player_row < ROWS-1:
@@ -153,59 +190,27 @@ while running:
                     player_col += 1
                 elif event.key == pygame.K_e and not is_waiting_for_llm:
                     if closest_npc is not None:
-                        player_query = "Where can I find milk and bread?"
-                        llm_result = categorize_products(player_query)
-                        validated_products = validate_products(llm_result, store_layout)
                         in_dialogue = True
+                        in_text_input = True
                         active_npc = closest_npc
-                        dialogue_index = (dialogue_index + 1) % len(active_npc.static_dialogue)
+                        player_input_text = ""
+                        dialogue_index = 0
                         npc_response = None
-                        is_waiting_for_llm = True
-
-                        threading.Thread(
-                            target = fetch_npc_response,
-                            args=(active_npc,),
-                            daemon=True
-                        ).start()
-
-                        if not is_waiting_for_llm:
-                            # adding player turn (for now, generic)
-                            active_npc.memory.append({
-                                "role": "player",
-                                "content": "The player interacted with you."
-                            })
-
-                            # adding npc response
-                            active_npc.memory.append({
-                                "role": "npc",
-                                "content": npc_response
-                            })
-
-                            # trimming memory
-                            if len(active_npc.memory) > MAX_MEMORY_TURNS * 2:
-                                active_npc.memory = active_npc.memory[-MAX_MEMORY_TURNS * 2:]
+                        customer_query = None
+                        show_npc_response = False
 
                 elif event.key == pygame.K_t:
-                    world_state["time_of_day"] = (
-                        "night" if world_state["time_of_day"] == "day" else "day"
-                    )
+                    world_state["store_busy"] = not world_state["store_busy"]
 
-                elif event.key == pygame.K_r:
-                    if world_state["player_reputation"] == "neutral":
-                        world_state["player_reputation"] = "bad"
-                    elif world_state["player_reputation"] == "bad":
-                        world_state["player_reputation"] = "good"
-                    else:
-                        world_state["player_reputation"] = "neutral"
+                elif event.key == pygame.K_c:
+                    # Clear customer's cart
+                    active_npc.clear_cart() if active_npc else None
 
-            elif event.key == pygame.K_ESCAPE:
-                in_dialogue = False
-                active_npc = None
         
     if in_dialogue and active_npc is not None:
 
         # Dialogue Box Dimensions
-        panel_height = 150
+        panel_height = 180
         panel_width = WIDTH
         panel_x = 0
         panel_y = HEIGHT - panel_height
@@ -219,23 +224,74 @@ while running:
         pygame.draw.rect(screen, (20, 20, 20), panel_rect)
         pygame.draw.rect(screen, (200, 200, 200), panel_rect, 2)
 
-        name_text = font.render(active_npc.name, True, (255, 255, 255))
-        
-        if is_waiting_for_llm:
-            dialogue_lines = ["Thinking..."]
-        elif npc_response is not None:
-            dialogue_lines = wrap_text(npc_response, font, text_max_width)
-        else:
-            dialogue_lines = active_npc.static_dialogue
-
-        # Displaying NPC name and Dialogue
-        screen.blit(name_text, (20, HEIGHT - 140))
+        name_text = font.render(active_npc.name + " (Shop Assistant)", True, (0, 200, 100))
+        screen.blit(name_text, (20, HEIGHT - 170))
 
         y_offset = panel_y + padding + 30
-        for line in dialogue_lines:
-            line_surface = font.render(line, True, (255, 255, 255))
-            screen.blit(line_surface, (panel_x + padding, y_offset))
-            y_offset += font.get_height() + 5
+
+        # If in text input mode, show input field
+        if in_text_input:
+            input_label = font.render("You: ", True, (200, 200, 100))
+            screen.blit(input_label, (panel_x + padding, y_offset))
+            
+            # Input box
+            input_box_rect = pygame.Rect(panel_x + padding + 50, y_offset, text_max_width - 50, 30)
+            pygame.draw.rect(screen, (255, 255, 255), input_box_rect, 2)
+            
+            input_surface = font.render(player_input_text, True, (255, 255, 255))
+            screen.blit(input_surface, (input_box_rect.x + 5, input_box_rect.y + 5))
+            
+            # Cursor
+            cursor_x = input_box_rect.x + 5 + input_surface.get_width()
+            pygame.draw.line(screen, (255, 255, 255), (cursor_x, input_box_rect.y + 5), 
+                           (cursor_x, input_box_rect.y + 25))
+            
+            # Instructions
+            instructions_text = font.render("Press ENTER to submit, ESC to cancel", True, (150, 150, 150))
+            screen.blit(instructions_text, (panel_x + padding, y_offset + 40))
+        
+        # Show assistant response after query is submitted
+        elif not in_text_input and customer_query is not None:
+            # Display customer's query
+            query_lines = wrap_text(f"You: {customer_query}", font, text_max_width)
+            for line in query_lines[:2]:  # Limit to 2 lines for query
+                line_surface = font.render(line, True, (200, 200, 100))
+                screen.blit(line_surface, (panel_x + padding, y_offset))
+                y_offset += font.get_height() + 3
+            
+            y_offset += 5
+            
+            # Display assistant response
+            if is_waiting_for_llm:
+                dialogue_lines = ["Helping you find products..."]
+            elif npc_response is not None:
+                show_npc_response = True
+                dialogue_lines = wrap_text(npc_response, font, text_max_width)
+                
+                # Add to memory when response is first shown
+                if len(active_npc.memory) > 0 and active_npc.memory[-1]["role"] == "customer":
+                    if len(active_npc.memory) == 0 or active_npc.memory[-1] != {"role": "assistant", "content": npc_response}:
+                        active_npc.memory.append({
+                            "role": "assistant",
+                            "content": npc_response
+                        })
+                        
+                        # Trim memory
+                        if len(active_npc.memory) > MAX_MEMORY_TURNS * 2:
+                            active_npc.memory = active_npc.memory[-MAX_MEMORY_TURNS * 2:]
+            else:
+                dialogue_lines = []
+            
+            for i, line in enumerate(dialogue_lines[:3]):  # Show up to 3 lines
+                line_surface = font.render(line, True, (255, 255, 255))
+                screen.blit(line_surface, (panel_x + padding, y_offset))
+                y_offset += font.get_height() + 3
+            
+            # Instructions for next step
+            if show_npc_response and not is_waiting_for_llm:
+                instructions_text = font.render("Press ENTER to continue talking, ESC to exit", True, (150, 150, 150))
+                screen.blit(instructions_text, (panel_x + padding, HEIGHT - 25))
+
 
     pygame.display.flip()
     clock.tick(60)
