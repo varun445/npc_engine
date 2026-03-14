@@ -1,0 +1,219 @@
+import pygame
+from ui.utils import wrap_text
+
+
+class UIState:
+    """Holds all mutable UI and dialogue state for a single frame."""
+
+    def __init__(self):
+        self.in_dialogue = False
+        self.active_npc = None
+        self.in_text_input = False
+        self.player_input_text = ""
+        self.customer_query = None
+        self.npc_response = None
+        self.npc_action = None
+        self.is_waiting_for_llm = False
+        self.show_npc_response = False
+        self.response_scroll_offset = 0
+        self.input_scroll_offset = 0
+
+    def reset_dialogue(self):
+        """Fully exit dialogue mode and clear all related state."""
+        self.in_dialogue = False
+        self.active_npc = None
+        self.in_text_input = False
+        self.player_input_text = ""
+        self.customer_query = None
+        self.npc_response = None
+        self.npc_action = None
+        self.show_npc_response = False
+        self.response_scroll_offset = 0
+        self.input_scroll_offset = 0
+
+    def reset_for_next_message(self):
+        """Keep dialogue open but clear the current exchange for a new query."""
+        self.player_input_text = ""
+        self.in_text_input = True
+        self.npc_response = None
+        self.npc_action = None
+        self.customer_query = None
+        self.show_npc_response = False
+        self.response_scroll_offset = 0
+        self.input_scroll_offset = 0
+
+
+class UIManager:
+    """Handles all pygame drawing: world entities and the dialogue panel."""
+
+    PANEL_HEIGHT = 300
+    PADDING = 20
+    LINE_SPACING = 3
+
+    def __init__(self, width, height, cell_size):
+        self.width = width
+        self.height = height
+        self.cell_size = cell_size
+        self.font = pygame.font.SysFont(None, 24)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def draw(self, screen, world_manager, interactable_npcs, ui_state):
+        """Draw the full frame: world entities and, if open, the dialogue panel."""
+        self._draw_world(screen, world_manager, interactable_npcs)
+        if ui_state.in_dialogue and ui_state.active_npc is not None:
+            self._draw_dialogue_panel(screen, ui_state)
+
+    # ------------------------------------------------------------------
+    # World rendering
+    # ------------------------------------------------------------------
+
+    def _draw_world(self, screen, world_manager, interactable_npcs):
+        for npc in world_manager.npcs:
+            npc_x = npc.col * self.cell_size
+            npc_y = npc.row * self.cell_size
+            pygame.draw.rect(screen, npc.color, (npc_x, npc_y, self.cell_size, self.cell_size))
+            if npc in interactable_npcs:
+                pygame.draw.rect(
+                    screen,
+                    (255, 255, 0),
+                    (npc_x, npc_y, self.cell_size, self.cell_size),
+                    3,
+                )
+
+        player_x = world_manager.player_col * self.cell_size
+        player_y = world_manager.player_row * self.cell_size
+        pygame.draw.rect(
+            screen,
+            (255, 255, 255),
+            (player_x, player_y, self.cell_size, self.cell_size),
+        )
+
+    # ------------------------------------------------------------------
+    # Dialogue panel
+    # ------------------------------------------------------------------
+
+    def _draw_dialogue_panel(self, screen, ui_state):
+        panel_x = 0
+        panel_y = self.height - self.PANEL_HEIGHT
+        panel_rect = pygame.Rect(panel_x, panel_y, self.width, self.PANEL_HEIGHT)
+        text_max_width = self.width - 2 * self.PADDING
+
+        pygame.draw.rect(screen, (20, 20, 20), panel_rect)
+        pygame.draw.rect(screen, (200, 200, 200), panel_rect, 2)
+
+        name_surface = self.font.render(
+            ui_state.active_npc.name + " (Shop Assistant)", True, (0, 200, 100)
+        )
+        screen.blit(name_surface, (self.PADDING, panel_y + 10))
+
+        y_offset = panel_y + self.PADDING + 30
+
+        if ui_state.in_text_input:
+            self._draw_input_box(screen, ui_state, panel_x, panel_y, y_offset, text_max_width)
+        elif ui_state.customer_query is not None:
+            self._draw_response(screen, ui_state, panel_x, panel_y, y_offset, text_max_width)
+
+    def _draw_input_box(self, screen, ui_state, panel_x, panel_y, y_offset, text_max_width):
+        screen.blit(
+            self.font.render("You: ", True, (200, 200, 100)),
+            (panel_x + self.PADDING, y_offset),
+        )
+
+        input_box_height = self.PANEL_HEIGHT - 110
+        input_box_rect = pygame.Rect(
+            panel_x + self.PADDING + 50,
+            y_offset,
+            text_max_width - 50,
+            input_box_height,
+        )
+        pygame.draw.rect(screen, (255, 255, 255), input_box_rect, 2)
+
+        line_height = self.font.get_height() + self.LINE_SPACING
+        wrapped_lines = wrap_text(
+            ui_state.player_input_text if ui_state.player_input_text else " ",
+            self.font,
+            input_box_rect.width - 10,
+        )
+        max_visible = max(1, (input_box_rect.height - 10) // line_height)
+        max_scroll = max(0, len(wrapped_lines) - max_visible)
+        ui_state.input_scroll_offset = min(ui_state.input_scroll_offset, max_scroll)
+
+        visible_start = max_scroll - ui_state.input_scroll_offset
+        visible_lines = wrapped_lines[visible_start : visible_start + max_visible]
+
+        input_y = input_box_rect.y + 5
+        for line in visible_lines:
+            screen.blit(
+                self.font.render(line, True, (255, 255, 255)),
+                (input_box_rect.x + 5, input_y),
+            )
+            input_y += line_height
+
+        # Blinking cursor on the last visible line
+        cursor_line_text = visible_lines[-1] if visible_lines else ""
+        cursor_x = input_box_rect.x + 5 + self.font.size(cursor_line_text)[0]
+        cursor_y = input_box_rect.y + 5 + (len(visible_lines) - 1) * line_height
+        pygame.draw.line(
+            screen,
+            (255, 255, 255),
+            (cursor_x, cursor_y),
+            (cursor_x, cursor_y + self.font.get_height()),
+        )
+
+        instruction = "Press ENTER to submit, ESC to cancel"
+        if max_scroll > 0:
+            instruction += ", UP/DOWN to scroll"
+        screen.blit(
+            self.font.render(instruction, True, (150, 150, 150)),
+            (panel_x + self.PADDING, panel_y + self.PANEL_HEIGHT - 25),
+        )
+
+    def _draw_response(self, screen, ui_state, panel_x, panel_y, y_offset, text_max_width):
+        query_lines = wrap_text(f"You: {ui_state.customer_query}", self.font, text_max_width)
+        for line in query_lines[:2]:
+            screen.blit(
+                self.font.render(line, True, (200, 200, 100)),
+                (panel_x + self.PADDING, y_offset),
+            )
+            y_offset += self.font.get_height() + self.LINE_SPACING
+
+        y_offset += 5
+
+        if ui_state.is_waiting_for_llm:
+            dialogue_lines = ["Helping you find products..."]
+        elif ui_state.npc_response is not None:
+            dialogue_lines = wrap_text(ui_state.npc_response, self.font, text_max_width)
+        else:
+            dialogue_lines = []
+
+        instructions_reserved = 25
+        panel_y_abs = self.height - self.PANEL_HEIGHT
+        available_height = (
+            self.PANEL_HEIGHT - (y_offset - panel_y_abs) - instructions_reserved
+        )
+        line_height = self.font.get_height() + self.LINE_SPACING
+        max_visible = max(1, available_height // line_height)
+        max_scroll = max(0, len(dialogue_lines) - max_visible)
+        ui_state.response_scroll_offset = min(ui_state.response_scroll_offset, max_scroll)
+
+        visible_lines = dialogue_lines[
+            ui_state.response_scroll_offset : ui_state.response_scroll_offset + max_visible
+        ]
+        for line in visible_lines:
+            screen.blit(
+                self.font.render(line, True, (255, 255, 255)),
+                (panel_x + self.PADDING, y_offset),
+            )
+            y_offset += line_height
+
+        if ui_state.show_npc_response and not ui_state.is_waiting_for_llm:
+            instruction = "Press ENTER to continue, ESC to exit"
+            if max_scroll > 0:
+                instruction += ", UP/DOWN to scroll"
+            screen.blit(
+                self.font.render(instruction, True, (150, 150, 150)),
+                (panel_x + self.PADDING, self.height - 25),
+            )
