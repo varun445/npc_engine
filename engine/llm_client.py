@@ -111,27 +111,54 @@ def detect_customer_intent(user_query):
 
 
 def generate_shop_assistant_response(assistant_name, customer_query, inventory_info, memory):
-    """Generate a natural response from the shop assistant"""
+    """Generate a structured JSON response from the shop assistant.
+
+    Returns a dict with keys:
+        dialogue     – the text the NPC says to the customer
+        action       – one of: "none", "move"
+        target_aisle – aisle number (int) when action is "move", else null
+    """
     memory_text = ""
     if memory:
         memory_text = "Previous conversation:\n"
         for msg in memory:
-            memory_text += f"Customer: {msg['content']}\n" if msg['role'] == 'customer' else f"You: {msg['content']}\n"
-    
+            memory_text += (
+                f"Customer: {msg['content']}\n"
+                if msg["role"] == "customer"
+                else f"You: {msg['content']}\n"
+            )
+
     prompt = f"""
     You are {assistant_name}, a friendly and helpful shop assistant.
-    
+
     {memory_text}
-    
+
     Available inventory information:
     {inventory_info}
-    
+
     Customer just asked: "{customer_query}"
-    
+
     Respond helpfully and naturally in 1-2 sentences. Be friendly, professional, and knowledgeable about the products.
+
+    You MUST reply with ONLY valid JSON in exactly this format and nothing else:
+    {{
+      "dialogue": "<your response to the customer>",
+      "action": "<one of: none, move>",
+      "target_aisle": <aisle number as an integer, or null>
+    }}
+
+    Use action "move" and set target_aisle when you are directing the customer to a specific aisle.
+    Use action "none" for all other responses.
     """
-    
-    return query_llm(prompt)
+
+    response = query_llm(prompt)
+    try:
+        result = json.loads(response)
+        if "dialogue" not in result:
+            result["dialogue"] = response
+        return result
+    except json.JSONDecodeError:
+        return {"dialogue": response, "action": "none", "target_aisle": None}
 
 
 def find_products_in_inventory(user_query, available_products):

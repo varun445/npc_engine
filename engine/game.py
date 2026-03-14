@@ -1,0 +1,76 @@
+import queue
+import pygame
+
+from engine.input_handler import MAX_MEMORY_TURNS
+from ui.ui_manager import UIState
+
+
+class Game:
+    """Owns the pygame screen, clock, result queue, and the primary game loop."""
+
+    def __init__(self, world_manager, ui_manager, input_handler, width=800, height=800):
+        self.world = world_manager
+        self.ui = ui_manager
+        self.input_handler = input_handler
+        self.result_queue = input_handler.result_queue
+        self.width = width
+        self.height = height
+
+        self.screen = pygame.display.set_mode((width, height))
+        pygame.display.set_caption("Shop Assistant - NPC Engine")
+        self.clock = pygame.time.Clock()
+        self.ui_state = UIState()
+
+    # ------------------------------------------------------------------
+    # Main loop
+    # ------------------------------------------------------------------
+
+    def run(self):
+        running = True
+        while running:
+            self._check_llm_queue()
+
+            interactable_npcs, closest_npc = self.world.get_interactable_npcs()
+
+            events = pygame.event.get()
+            running = self.input_handler.handle_events(events, self.ui_state, closest_npc)
+
+            self.screen.fill((30, 30, 30))
+            self.ui.draw(self.screen, self.world, interactable_npcs, self.ui_state)
+            pygame.display.flip()
+            self.clock.tick(60)
+
+        pygame.quit()
+
+    # ------------------------------------------------------------------
+    # LLM queue polling
+    # ------------------------------------------------------------------
+
+    def _check_llm_queue(self):
+        """Non-blocking check of the result queue for completed LLM responses."""
+        try:
+            result = self.result_queue.get_nowait()
+        except queue.Empty:
+            return
+
+        self.ui_state.is_waiting_for_llm = False
+        self.ui_state.npc_response = result.get("dialogue", "")
+        self.ui_state.npc_action = result.get("action")
+        self.ui_state.show_npc_response = True
+
+        npc = self.ui_state.active_npc
+        if npc and self.ui_state.npc_response:
+            last = npc.memory[-1] if npc.memory else None
+            if last != {"role": "assistant", "content": self.ui_state.npc_response}:
+                npc.memory.append({"role": "assistant", "content": self.ui_state.npc_response})
+                if len(npc.memory) > MAX_MEMORY_TURNS * 2:
+                    npc.memory = npc.memory[-MAX_MEMORY_TURNS * 2 :]
+
+        # Dispatch NPC action (e.g., move to target aisle)
+        if self.ui_state.npc_action == "move" and npc:
+            target_aisle = result.get("target_aisle")
+            if target_aisle is not None:
+                # Map aisle number to grid column; keep a fixed row near the top
+                aisle_col_map = {1: 3, 2: 6, 3: 10, 4: 14, 5: 17}
+                npc.col = aisle_col_map.get(int(target_aisle), npc.col)
+                npc.row = 2
