@@ -34,24 +34,31 @@ def _fetch_npc_response(npc, query, inventory, result_queue):
       3. Call ``generate_shop_assistant_response`` once with the observations
          already populated.  The LLM only needs to output a final Format B
          answer — it never has to decide whether to search.
+
+    A result is always placed in the queue, even on error, so the game loop
+    never hangs waiting for a response that will never arrive.
     """
-    from engine.llm_client import generate_shop_assistant_response, extract_product_terms
+    try:
+        from engine.llm_client import generate_shop_assistant_response, extract_product_terms
 
-    inventory_summary = _build_inventory_summary(inventory)
-    tool_observations = []
+        inventory_summary = _build_inventory_summary(inventory)
+        tool_observations = []
 
-    # Step 1: extract product terms and pre-search BEFORE calling the main LLM.
-    # This removes the "should I search?" decision from the main LLM and
-    # eliminates the loop that caused Mistral to search for "Cake Ingredients".
-    product_terms = extract_product_terms(query)
-    if product_terms:
-        observation = inventory.search_inventory(product_terms)
-        tool_observations.append(observation)
+        # Step 1: extract product terms and pre-search BEFORE calling the main LLM.
+        # This removes the "should I search?" decision from the main LLM and
+        # eliminates the loop that caused Mistral to search for "Cake Ingredients".
+        product_terms = extract_product_terms(query)
+        if product_terms:
+            observation = inventory.search_inventory(product_terms)
+            tool_observations.append(observation)
 
-    # Step 2: single main LLM call to generate the customer-facing response.
-    result = generate_shop_assistant_response(
-        npc.name, query, inventory_summary, npc.memory, tool_observations
-    )
+        # Step 2: single main LLM call to generate the customer-facing response.
+        result = generate_shop_assistant_response(
+            npc.name, query, inventory_summary, npc.memory, tool_observations
+        )
+    except Exception as e:
+        print(f"[NPC ERROR] Background thread failed: {type(e).__name__}: {e}")
+        result = {"dialogue": "Sorry, I'm having trouble right now. Please try again later.", "action": "none", "target_aisles": []}
 
     result_queue.put(result)
 
