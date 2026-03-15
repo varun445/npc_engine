@@ -5,15 +5,21 @@ MAX_MEMORY_TURNS = 5
 
 
 def _build_inventory_summary(inventory):
-    """Build a concise text summary of in-stock products for the LLM prompt."""
-    product_list = []
+    """Build a concise text summary of in-stock products for the LLM prompt.
+
+    Each line explicitly states the product name AND its aisle number so the
+    LLM can look up exact names rather than guessing categories from internal
+    knowledge.
+    """
+    lines = []
     for category, products in inventory.products.items():
+        aisle_num = inventory.aisles[category]
         for product in products:
             if product["stock"] > 0:
-                product_list.append(
-                    f"{product['name']} (${product['price']:.2f}, Aisle {inventory.aisles[category]})"
+                lines.append(
+                    f"{product['name']} (${product['price']:.2f}) — category: {category}, Aisle {aisle_num}"
                 )
-    return "Available products: " + " | ".join(product_list[:10])
+    return "Store inventory:\n" + "\n".join(lines)
 
 
 def _fetch_npc_response(npc, query, inventory, result_queue):
