@@ -1,4 +1,6 @@
 class NPC:
+    MOVE_EVERY = 15  # frames between each path step (~4 cells/sec at 60 fps)
+
     def __init__(self, name, row, col, color, interaction_range, static_dialogue, personality):
         self.name = name
         self.row = row
@@ -8,6 +10,20 @@ class NPC:
         self.static_dialogue = static_dialogue
         self.personality = personality
         self.memory = []
+        # Path-following state
+        self.path = []           # list of (row, col) steps remaining
+        self.path_timer = 0      # counts frames since last step
+        self.move_every = self.MOVE_EVERY
+
+    def update(self):
+        """Advance the NPC one step along its current path when the timer fires."""
+        if not self.path:
+            return
+        self.path_timer += 1
+        if self.path_timer >= self.move_every:
+            self.path_timer = 0
+            next_cell = self.path.pop(0)
+            self.row, self.col = next_cell
 
 
 class ShopAssistant(NPC):

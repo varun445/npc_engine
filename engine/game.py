@@ -3,6 +3,7 @@ import pygame
 
 from engine.input_handler import MAX_MEMORY_TURNS
 from ui.ui_manager import UIState
+from world.pathfinding import astar
 
 
 class Game:
@@ -29,6 +30,10 @@ class Game:
         running = True
         while running:
             self._check_llm_queue()
+
+            # Advance NPC path-following one step per frame
+            for npc in self.world.npcs:
+                npc.update()
 
             interactable_npcs, closest_npc = self.world.get_interactable_npcs()
 
@@ -70,7 +75,14 @@ class Game:
         if self.ui_state.npc_action == "move" and npc:
             target_aisle = result.get("target_aisle")
             if target_aisle is not None:
-                # Map aisle number to grid column; keep a fixed row near the top
-                aisle_col_map = {1: 3, 2: 6, 3: 10, 4: 14, 5: 17}
-                npc.col = aisle_col_map.get(int(target_aisle), npc.col)
-                npc.row = 2
+                dest = self.world.get_aisle_destination(int(target_aisle))
+                if dest:
+                    path = astar(
+                        (npc.row, npc.col),
+                        dest,
+                        self.world.obstacles,
+                        self.world.rows,
+                        self.world.cols,
+                    )
+                    npc.path = path
+                    npc.path_timer = 0
