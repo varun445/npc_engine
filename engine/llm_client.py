@@ -248,15 +248,20 @@ Instructions:
 - If found items are in different aisles, list ALL those aisle numbers in target_aisles.
 - Keep your response to 1-2 sentences.
 
+ACTION RULES (follow exactly):
+- If the FOUND section above contains any items → set action to "move" and list every
+  found item's aisle number in target_aisles. Do this even if the customer only asked
+  where something is — your job is to physically guide them there.
+- If the FOUND section is empty (all items not found, or no search was done) → set
+  action to "none" and target_aisles to [].
+- NEVER set action to "none" when there are found items with aisle numbers.
+
 Reply with ONLY valid JSON in this exact format and nothing else:
 {{
   "dialogue": "<your response to the customer>",
   "action": "<none or move>",
   "target_aisles": [<aisle numbers as integers, or empty []>]
 }}
-
-Use action "move" with target_aisles populated when directing the customer to specific aisles.
-Use action "none" with empty target_aisles for greetings or when no movement is needed.
 """
 
     response = query_llm(prompt)
@@ -278,6 +283,10 @@ Use action "none" with empty target_aisles for greetings or when no movement is 
                 result["target_aisles"] = [int(result["target_aisles"])]
             except (TypeError, ValueError):
                 result["target_aisles"] = []
+        # Safeguard: if aisles are populated the action must be "move".
+        # A model may correctly identify aisles but forget to set the action.
+        if result["target_aisles"] and result.get("action") != "move":
+            result["action"] = "move"
         return result
     except json.JSONDecodeError:
         return {"dialogue": response, "action": "none", "target_aisles": []}
