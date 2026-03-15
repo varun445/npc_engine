@@ -1,3 +1,56 @@
+# ---------------------------------------------------------------------------
+# Aisle definitions
+# Each aisle entry describes a rectangular block on the grid that acts as
+# both a visual landmark and a collidable obstacle.
+#
+# grid_rect: (start_col, start_row, end_col, end_row)  — all inclusive
+# dest:      (row, col) where the NPC should stand when "at" this aisle
+# color:     RGB fill colour for the rendered rectangle
+# ---------------------------------------------------------------------------
+AISLES = [
+    {
+        "id": 1,
+        "name": "Dairy",
+        "categories": ["dairy"],
+        "grid_rect": (2, 2, 3, 9),
+        "dest": (10, 2),
+        "color": (70, 130, 180),
+    },
+    {
+        "id": 2,
+        "name": "Bakery",
+        "categories": ["bakery"],
+        "grid_rect": (6, 2, 7, 9),
+        "dest": (10, 6),
+        "color": (210, 160, 80),
+    },
+    {
+        "id": 3,
+        "name": "Produce",
+        "categories": ["fruits", "vegetables"],
+        "grid_rect": (9, 2, 10, 9),
+        "dest": (10, 9),
+        "color": (60, 180, 80),
+    },
+    {
+        "id": 4,
+        "name": "Beverages",
+        "categories": ["beverages"],
+        "grid_rect": (13, 2, 14, 9),
+        "dest": (10, 13),
+        "color": (150, 80, 200),
+    },
+    {
+        "id": 5,
+        "name": "Snacks",
+        "categories": ["snacks"],
+        "grid_rect": (17, 2, 18, 9),
+        "dest": (10, 17),
+        "color": (200, 80, 80),
+    },
+]
+
+
 class WorldManager:
     """Manages player position, NPC list, world state, and spatial queries."""
 
@@ -8,10 +61,37 @@ class WorldManager:
         self.player_row = rows // 2
         self.player_col = cols // 2
         self.npcs = []
+        self.aisles = AISLES
+        self.obstacles = self._build_obstacles()
         self.world_state = {
             "store_busy": False,
             "current_time": "day",
         }
+
+    # ------------------------------------------------------------------
+    # Obstacle helpers
+    # ------------------------------------------------------------------
+
+    def _build_obstacles(self):
+        """Return the set of (row, col) grid cells occupied by aisles."""
+        cells = set()
+        for aisle in self.aisles:
+            start_col, start_row, end_col, end_row = aisle["grid_rect"]
+            for r in range(start_row, end_row + 1):
+                for c in range(start_col, end_col + 1):
+                    cells.add((r, c))
+        return cells
+
+    def get_aisle_destination(self, aisle_id):
+        """Return the (row, col) destination cell for the given aisle id."""
+        for aisle in self.aisles:
+            if aisle["id"] == aisle_id:
+                return aisle["dest"]
+        return None
+
+    # ------------------------------------------------------------------
+    # NPC management
+    # ------------------------------------------------------------------
 
     def add_npc(self, npc):
         """Add an NPC to the world."""
@@ -33,13 +113,26 @@ class WorldManager:
                     closest = npc
         return interactable, closest
 
+    # ------------------------------------------------------------------
+    # Player movement (obstacle-aware)
+    # ------------------------------------------------------------------
+
     def move_player(self, direction):
-        """Move the player one cell in the given direction."""
-        if direction == "up" and self.player_row > 0:
-            self.player_row -= 1
-        elif direction == "down" and self.player_row < self.rows - 1:
-            self.player_row += 1
-        elif direction == "left" and self.player_col > 0:
-            self.player_col -= 1
-        elif direction == "right" and self.player_col < self.cols - 1:
-            self.player_col += 1
+        """Move the player one cell in the given direction, respecting obstacles."""
+        new_row, new_col = self.player_row, self.player_col
+        if direction == "up":
+            new_row -= 1
+        elif direction == "down":
+            new_row += 1
+        elif direction == "left":
+            new_col -= 1
+        elif direction == "right":
+            new_col += 1
+
+        if (
+            0 <= new_row < self.rows
+            and 0 <= new_col < self.cols
+            and (new_row, new_col) not in self.obstacles
+        ):
+            self.player_row = new_row
+            self.player_col = new_col

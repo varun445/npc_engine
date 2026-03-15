@@ -55,6 +55,7 @@ class UIManager:
         self.height = height
         self.cell_size = cell_size
         self.font = pygame.font.SysFont(None, 24)
+        self.aisle_font = pygame.font.SysFont(None, 18)
 
     # ------------------------------------------------------------------
     # Public API
@@ -71,6 +72,8 @@ class UIManager:
     # ------------------------------------------------------------------
 
     def _draw_world(self, screen, world_manager, interactable_npcs):
+        self._draw_aisles(screen, world_manager)
+
         for npc in world_manager.npcs:
             npc_x = npc.col * self.cell_size
             npc_y = npc.row * self.cell_size
@@ -90,6 +93,30 @@ class UIManager:
             (255, 255, 255),
             (player_x, player_y, self.cell_size, self.cell_size),
         )
+
+    # ------------------------------------------------------------------
+    # Aisle rendering
+    # ------------------------------------------------------------------
+
+    def _draw_aisles(self, screen, world_manager):
+        """Draw each aisle as a coloured rectangle with a rotated text label."""
+        for aisle in world_manager.aisles:
+            start_col, start_row, end_col, end_row = aisle["grid_rect"]
+            x = start_col * self.cell_size
+            y = start_row * self.cell_size
+            width = (end_col - start_col + 1) * self.cell_size
+            height = (end_row - start_row + 1) * self.cell_size
+
+            # Fill and border
+            pygame.draw.rect(screen, aisle["color"], (x, y, width, height))
+            pygame.draw.rect(screen, (220, 220, 220), (x, y, width, height), 2)
+
+            # Render label rotated 90° so it fits inside the tall, narrow aisle
+            label_surf = self.aisle_font.render(aisle["name"], True, (255, 255, 255))
+            rotated = pygame.transform.rotate(label_surf, 90)
+            label_x = x + width // 2 - rotated.get_width() // 2
+            label_y = y + height // 2 - rotated.get_height() // 2
+            screen.blit(rotated, (label_x, label_y))
 
     # ------------------------------------------------------------------
     # Dialogue panel
