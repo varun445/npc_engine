@@ -24,8 +24,8 @@ def main():
     world = WorldManager(rows=ROWS, cols=COLS, cell_size=CELL_SIZE)
     shop_assistant = ShopAssistant(
         name="Alex",
-        row=0,
-        col=0,
+        row=16,
+        col=9,
         color=(0, 200, 100),
         interaction_range=5,
         inventory=inventory,
