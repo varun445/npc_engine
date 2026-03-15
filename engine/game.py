@@ -71,15 +71,35 @@ class Game:
                 if len(npc.memory) > MAX_MEMORY_TURNS * 2:
                     npc.memory = npc.memory[-MAX_MEMORY_TURNS * 2 :]
 
-        # Dispatch NPC action (e.g., move to target aisle)
+        # Dispatch NPC action (e.g., move to one or more target aisles)
         if self.ui_state.npc_action == "move" and npc:
-            target_aisle = result.get("target_aisle")
-            if target_aisle is not None:
-                dest = self.world.get_aisle_destination(int(target_aisle))
-                if dest:
+            target_aisles = result.get("target_aisles") or []
+            # Backwards-compat: fall back to legacy single-value field
+            if not target_aisles:
+                legacy = result.get("target_aisle")
+                if legacy is not None:
+                    target_aisles = [int(legacy)]
+
+            if target_aisles:
+                destinations = []
+                for aisle_id in target_aisles:
+                    dest = self.world.get_aisle_destination(int(aisle_id))
+                    if dest:
+                        destinations.append(dest)
+
+                if destinations:
+                    # Attach world geometry to the NPC so its update() loop can
+                    # call astar autonomously for subsequent queue entries.
+                    npc._obstacles = self.world.obstacles
+                    npc._grid_size = (self.world.rows, self.world.cols)
+
+                    # Kick off pathfinding to the first destination immediately;
+                    # the rest are held in the queue.
+                    npc.destination_queue = list(destinations[1:])
+                    first_dest = destinations[0]
                     path = astar(
                         (npc.row, npc.col),
-                        dest,
+                        first_dest,
                         self.world.obstacles,
                         self.world.rows,
                         self.world.cols,

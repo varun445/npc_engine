@@ -114,9 +114,9 @@ def generate_shop_assistant_response(assistant_name, customer_query, inventory_i
     """Generate a structured JSON response from the shop assistant.
 
     Returns a dict with keys:
-        dialogue     – the text the NPC says to the customer
-        action       – one of: "none", "move"
-        target_aisle – aisle number (int) when action is "move", else null
+        dialogue      – the text the NPC says to the customer
+        action        – one of: "none", "move"
+        target_aisles – list of aisle numbers (int) when action is "move", else []
     """
     memory_text = ""
     if memory:
@@ -131,24 +131,30 @@ def generate_shop_assistant_response(assistant_name, customer_query, inventory_i
     prompt = f"""
     You are {assistant_name}, a friendly and helpful shop assistant.
 
+    STRICT RULES — you MUST follow these exactly:
+    1. You MUST use ONLY the inventory list provided below to determine which aisle any item belongs to.
+       Do NOT rely on your own knowledge to categorise items. Look up the exact item name in the list.
+    2. If the customer mentions multiple items that belong to different aisles, include ALL relevant
+       aisle numbers in target_aisles (e.g. [3, 5]).
+    3. Keep your dialogue to 1-2 sentences maximum.
+
     {memory_text}
 
-    Available inventory information:
+    Available inventory (each entry shows: product name, price, and its aisle number):
     {inventory_info}
 
     Customer just asked: "{customer_query}"
-
-    Respond helpfully and naturally in 1-2 sentences. Be friendly, professional, and knowledgeable about the products.
 
     You MUST reply with ONLY valid JSON in exactly this format and nothing else:
     {{
       "dialogue": "<your response to the customer>",
       "action": "<one of: none, move>",
-      "target_aisle": <aisle number as an integer, or null>
+      "target_aisles": [<aisle number(s) as integers, or empty list []>]
     }}
 
-    Use action "move" and set target_aisle when you are directing the customer to a specific aisle.
-    Use action "none" for all other responses.
+    Use action "move" and populate target_aisles when you are directing the customer to one or more
+    aisles. Use action "none" and an empty target_aisles list for all other responses.
+    Always derive aisle numbers by looking up the exact product name in the inventory list above.
     """
 
     response = query_llm(prompt)
@@ -156,9 +162,22 @@ def generate_shop_assistant_response(assistant_name, customer_query, inventory_i
         result = json.loads(response)
         if "dialogue" not in result:
             result["dialogue"] = response
+        # Normalise: ensure target_aisles is always a list
+        if "target_aisles" not in result:
+            # Fall back to legacy single-value field if present
+            legacy = result.get("target_aisle")
+            try:
+                result["target_aisles"] = [int(legacy)] if legacy is not None else []
+            except (TypeError, ValueError):
+                result["target_aisles"] = []
+        elif not isinstance(result["target_aisles"], list):
+            try:
+                result["target_aisles"] = [int(result["target_aisles"])]
+            except (TypeError, ValueError):
+                result["target_aisles"] = []
         return result
     except json.JSONDecodeError:
-        return {"dialogue": response, "action": "none", "target_aisle": None}
+        return {"dialogue": response, "action": "none", "target_aisles": []}
 
 
 def find_products_in_inventory(user_query, available_products):
