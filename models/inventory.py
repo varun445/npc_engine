@@ -1,5 +1,7 @@
 # Product Inventory System for Shop Assistant
 
+SEARCH_RESULTS_PREFIX = "Search Results: "
+
 PRODUCTS = {
     "dairy": [
         {"id": "milk_1l", "name": "Milk (1L)", "price": 2.50, "stock": 15},
@@ -127,4 +129,4 @@ class Inventory:
                 results.append(f"{term}: {', '.join(matches)}")
             else:
                 results.append(f"{term}: not found in store inventory")
-        return "Search Results: " + "; ".join(results)
+        return SEARCH_RESULTS_PREFIX + "; ".join(results)

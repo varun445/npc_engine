@@ -1,5 +1,6 @@
 import requests
 import json
+from models.inventory import SEARCH_RESULTS_PREFIX
 DEBUG_LLM = True
 
 def query_llm(prompt):
@@ -159,6 +160,41 @@ Customer query: "{customer_query}"
         return []
 
 
+def _format_search_observations(tool_observations):
+    """Parse tool observation strings into clearly separated FOUND / NOT FOUND sections.
+
+    Each observation string produced by ``inventory.search_inventory`` has the
+    form::
+
+        "Search Results: term1: value1; term2: not found in store inventory; ..."
+
+    This function splits that blob into two explicit lists so the main LLM
+    prompt can emphasise the found items and not overlook them.
+
+    Returns a tuple ``(found_lines, not_found_names)`` where:
+        found_lines  — list of strings like "milk: Milk (1L) (Aisle 1, $2.50)"
+        not_found_names — list of term strings that were not in stock
+    """
+    found_lines = []
+    not_found_names = []
+
+    for obs in tool_observations:
+        # Strip the "Search Results: " prefix if present
+        body = obs[len(SEARCH_RESULTS_PREFIX):] if obs.startswith(SEARCH_RESULTS_PREFIX) else obs
+        for entry in body.split("; "):
+            if ": " not in entry:
+                continue
+            term, value = entry.split(": ", 1)
+            term = term.strip()
+            value = value.strip()
+            if "not found in store inventory" in value:
+                not_found_names.append(term)
+            else:
+                found_lines.append(f"{term}: {value}")
+
+    return found_lines, not_found_names
+
+
 def generate_shop_assistant_response(
     assistant_name, customer_query, inventory_info, memory, tool_observations=None
 ):
@@ -168,6 +204,10 @@ def generate_shop_assistant_response(
     ``_fetch_npc_response``), so *tool_observations* always contains the
     relevant search results for product-related queries.  The LLM's only job
     here is to interpret those results and answer the customer.
+
+    The full inventory list is NOT included in this prompt — the pre-search
+    results are sufficient and sending the entire catalogue adds noise that
+    causes small models to overlook found items.
 
     Returns a dict with keys: ``dialogue``, ``action``, ``target_aisles``.
     """
@@ -181,25 +221,31 @@ def generate_shop_assistant_response(
                 else f"You: {msg['content']}\n"
             )
 
-    tool_obs_text = ""
+    # Build two explicit sections so the LLM cannot overlook found items.
+    search_section = ""
     if tool_observations:
-        tool_obs_text = "\nInventory Search Results:\n"
-        for obs in tool_observations:
-            tool_obs_text += f"- {obs}\n"
+        found_lines, not_found_names = _format_search_observations(tool_observations)
+
+        if found_lines:
+            search_section += "\n*** ITEMS WE CARRY (you MUST tell the customer about each one with its aisle number) ***\n"
+            for line in found_lines:
+                search_section += f"  FOUND: {line}\n"
+
+        if not_found_names:
+            search_section += "\n*** ITEMS NOT IN STOCK (tell the customer we do not carry these) ***\n"
+            for name in not_found_names:
+                search_section += f"  NOT FOUND: {name}\n"
 
     prompt = f"""You are {assistant_name}, a friendly and helpful shop assistant in a grocery store.
 
-{memory_text}
-{tool_obs_text}
-Available inventory (product name, price, aisle):
-{inventory_info}
-
+{memory_text}{search_section}
 Customer just asked: "{customer_query}"
 
 Instructions:
-- Answer the customer honestly based ONLY on the Inventory Search Results above (if provided) or the available inventory list.
-- If an item is listed as "not found in store inventory", tell the customer we do not carry it.
-- If items are in different aisles, include ALL relevant aisle numbers in target_aisles.
+- Your answer MUST be based ONLY on the search results listed above.
+- For every item in the FOUND section: mention it by name and state its exact aisle number.
+- For every item in the NOT FOUND section: tell the customer we do not carry it.
+- If found items are in different aisles, list ALL those aisle numbers in target_aisles.
 - Keep your response to 1-2 sentences.
 
 Reply with ONLY valid JSON in this exact format and nothing else:
