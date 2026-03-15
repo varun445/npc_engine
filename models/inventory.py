@@ -90,3 +90,41 @@ class Inventory:
                 if product["id"] == product_id:
                     return product
         return None
+
+    def search_inventory(self, search_terms):
+        """Search inventory for a list of search terms.
+
+        Checks each term against product names and IDs and returns a plain-text
+        summary that can be fed back to the LLM as a tool observation.
+
+        Args:
+            search_terms: list of strings to look up (e.g. ["sugar", "eggs"])
+
+        Returns:
+            A string such as:
+            "Search Results: sugar: Sugar (Aisle 3, $1.00, 20 in stock);
+             eggs: not found in store inventory"
+        """
+        results = []
+        for term in search_terms:
+            term_lower = term.lower().strip()
+            matches = []
+            for category, products in self.products.items():
+                aisle_num = self.aisles[category]
+                for product in products:
+                    if (
+                        term_lower in product["name"].lower()
+                        or term_lower in product["id"].lower()
+                    ):
+                        if product["stock"] > 0:
+                            matches.append(
+                                f"{product['name']} (Aisle {aisle_num},"
+                                f" ${product['price']:.2f}, {product['stock']} in stock)"
+                            )
+                        else:
+                            matches.append(f"{product['name']} (out of stock)")
+            if matches:
+                results.append(f"{term}: {', '.join(matches)}")
+            else:
+                results.append(f"{term}: not found in store inventory")
+        return "Search Results: " + "; ".join(results)

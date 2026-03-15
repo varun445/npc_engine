@@ -23,14 +23,57 @@ def _build_inventory_summary(inventory):
 
 
 def _fetch_npc_response(npc, query, inventory, result_queue):
-    """Background worker: calls the LLM and puts the parsed JSON result in result_queue."""
+    """Background worker: runs the ReAct agentic loop and puts the final result in result_queue.
+
+    Loop (up to MAX_REACT_ITERATIONS times):
+      1. Call the LLM.
+      2. If the LLM returns action "search_database", execute the search against the
+         real inventory and append the result as a tool observation, then loop again.
+      3. When the LLM returns action "move" or "none" (a final response), put it in
+         the queue and return.
+
+    This eliminates hallucinations: the LLM must look up the actual data before
+    it can tell the customer whether an item is available or where to find it.
+    """
     from engine.llm_client import generate_shop_assistant_response
 
+    MAX_REACT_ITERATIONS = 3
+
     inventory_summary = _build_inventory_summary(inventory)
-    result = generate_shop_assistant_response(
-        npc.name, query, inventory_summary, npc.memory
+    tool_observations = []
+
+    for _ in range(MAX_REACT_ITERATIONS):
+        result = generate_shop_assistant_response(
+            npc.name, query, inventory_summary, npc.memory, tool_observations
+        )
+
+        if result.get("action") == "search_database":
+            search_terms = result.get("search_terms", [])
+            if search_terms:
+                observation = inventory.search_inventory(search_terms)
+                tool_observations.append(observation)
+            else:
+                # Guard against the LLM issuing an empty search that would
+                # silently waste an iteration without making progress.
+                tool_observations.append(
+                    "Tool Error: 'search_database' was requested but no search_terms were provided. "
+                    "Please include specific item names in search_terms."
+                )
+            # Loop again with the new observation in context
+            continue
+
+        # Final response (action is "move" or "none")
+        result_queue.put(result)
+        return
+
+    # Fallback: max iterations reached without a conclusive response
+    result_queue.put(
+        {
+            "dialogue": "I'm having difficulty processing your request right now. Please try rephrasing your question.",
+            "action": "none",
+            "target_aisles": [],
+        }
     )
-    result_queue.put(result)
 
 
 class InputHandler:

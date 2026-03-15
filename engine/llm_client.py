@@ -110,13 +110,29 @@ def detect_customer_intent(user_query):
         return {"intent": "other", "confidence": 0}
 
 
-def generate_shop_assistant_response(assistant_name, customer_query, inventory_info, memory):
+def generate_shop_assistant_response(
+    assistant_name, customer_query, inventory_info, memory, tool_observations=None
+):
     """Generate a structured JSON response from the shop assistant.
 
-    Returns a dict with keys:
-        dialogue      – the text the NPC says to the customer
-        action        – one of: "none", "move"
-        target_aisles – list of aisle numbers (int) when action is "move", else []
+    Supports the ReAct (Reasoning + Acting) loop.  When the LLM needs to look
+    up items before answering it may return the intermediate action:
+
+        {"action": "search_database", "search_terms": ["item1", "item2"]}
+
+    The caller is responsible for executing the search, appending the result to
+    *tool_observations*, and calling this function again.  When the LLM is
+    ready to answer the customer it returns:
+
+        {"dialogue": "...", "action": "none"|"move", "target_aisles": [...]}
+
+    Args:
+        assistant_name:    Name of the shop-assistant NPC.
+        customer_query:    The raw text the customer typed.
+        inventory_info:    Pre-built inventory summary string.
+        memory:            List of {"role": ..., "content": ...} dicts.
+        tool_observations: Optional list of search-result strings accumulated
+                           during the current ReAct loop.
     """
     memory_text = ""
     if memory:
@@ -128,38 +144,70 @@ def generate_shop_assistant_response(assistant_name, customer_query, inventory_i
                 else f"You: {msg['content']}\n"
             )
 
+    tool_obs_text = ""
+    if tool_observations:
+        tool_obs_text = "\nTool Observations (results from database searches you already ran):\n"
+        for obs in tool_observations:
+            tool_obs_text += f"- {obs}\n"
+
     prompt = f"""
     You are {assistant_name}, a friendly and helpful shop assistant.
 
     STRICT RULES — you MUST follow these exactly:
-    1. You MUST use ONLY the inventory list provided below to determine which aisle any item belongs to.
-       Do NOT rely on your own knowledge to categorise items. Look up the exact item name in the list.
-    2. If the customer mentions multiple items that belong to different aisles, include ALL relevant
+    1. NEVER guess or assume what is in stock. You MUST use the "search_database" action to
+       verify any item the customer mentions before giving them information about it.
+    2. Only use the Tool Observations (search results) or the inventory list below to answer.
+       Do NOT rely on your own knowledge to determine availability or aisle locations.
+    3. If the customer asks about specific products or ingredients, output the "search_database"
+       action FIRST. Only output a final "move" or "none" response after you have search results.
+    4. If search results confirm items are available in different aisles, include ALL relevant
        aisle numbers in target_aisles (e.g. [3, 5]).
-    3. Keep your dialogue to 1-2 sentences maximum.
+    5. Keep your dialogue to 1-2 sentences maximum.
 
     {memory_text}
+    {tool_obs_text}
 
     Available inventory (each entry shows: product name, price, and its aisle number):
     {inventory_info}
 
     Customer just asked: "{customer_query}"
 
-    You MUST reply with ONLY valid JSON in exactly this format and nothing else:
+    You MUST reply with ONLY valid JSON in one of the two formats below and nothing else.
+
+    Format A — to search the database before answering (use this when unsure about stock):
+    {{
+      "action": "search_database",
+      "search_terms": ["<item1>", "<item2>"]
+    }}
+
+    Format B — final response to the customer (only after you have search results, or for
+    greetings/general questions that do not require an inventory lookup):
     {{
       "dialogue": "<your response to the customer>",
       "action": "<one of: none, move>",
       "target_aisles": [<aisle number(s) as integers, or empty list []>]
     }}
 
-    Use action "move" and populate target_aisles when you are directing the customer to one or more
-    aisles. Use action "none" and an empty target_aisles list for all other responses.
-    Always derive aisle numbers by looking up the exact product name in the inventory list above.
+    Use Format A when the customer asks about specific products or ingredients.
+    Use Format B with action "move" and target_aisles populated to direct the customer to aisles.
+    Use Format B with action "none" and empty target_aisles for greetings or when no movement needed.
     """
 
     response = query_llm(prompt)
     try:
         result = json.loads(response)
+
+        # Intermediate ReAct step: LLM wants to search the database
+        if result.get("action") == "search_database":
+            if not isinstance(result.get("search_terms"), list):
+                print(
+                    f"[ReAct] Warning: LLM returned 'search_database' with invalid "
+                    f"search_terms ({result.get('search_terms')!r}). Resetting to []."
+                )
+                result["search_terms"] = []
+            return result
+
+        # Final response – normalise fields
         if "dialogue" not in result:
             result["dialogue"] = response
         # Normalise: ensure target_aisles is always a list
