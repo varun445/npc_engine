@@ -49,6 +49,17 @@ def _fetch_npc_response(npc, query, inventory, result_queue):
 
         if result.get("action") == "search_database":
             search_terms = result.get("search_terms", [])
+
+            # Safety guard: if we already have observations but the LLM is still
+            # trying to search, do not allow it to loop indefinitely. Break out
+            # and let the fallback message handle it.
+            if tool_observations:
+                print(
+                    "[ReAct] Warning: LLM issued a second 'search_database' action after "
+                    "observations were already provided. Stopping loop to avoid infinite cycle."
+                )
+                break
+
             if search_terms:
                 observation = inventory.search_inventory(search_terms)
                 tool_observations.append(observation)
@@ -56,8 +67,8 @@ def _fetch_npc_response(npc, query, inventory, result_queue):
                 # Guard against the LLM issuing an empty search that would
                 # silently waste an iteration without making progress.
                 tool_observations.append(
-                    "Tool Error: 'search_database' was requested but no search_terms were provided. "
-                    "Please include specific item names in search_terms."
+                    "Tool Error: 'search_database' was requested with empty search_terms. "
+                    "Please provide a non-empty list of individual product names."
                 )
             # Loop again with the new observation in context
             continue

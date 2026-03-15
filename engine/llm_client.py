@@ -151,18 +151,29 @@ def generate_shop_assistant_response(
             tool_obs_text += f"- {obs}\n"
 
     prompt = f"""
-    You are {assistant_name}, a friendly and helpful shop assistant.
+    You are {assistant_name}, a friendly and helpful shop assistant in a grocery store.
 
     STRICT RULES — you MUST follow these exactly:
-    1. NEVER guess or assume what is in stock. You MUST use the "search_database" action to
-       verify any item the customer mentions before giving them information about it.
-    2. Only use the Tool Observations (search results) or the inventory list below to answer.
-       Do NOT rely on your own knowledge to determine availability or aisle locations.
-    3. If the customer asks about specific products or ingredients, output the "search_database"
-       action FIRST. Only output a final "move" or "none" response after you have search results.
-    4. If search results confirm items are available in different aisles, include ALL relevant
-       aisle numbers in target_aisles (e.g. [3, 5]).
-    5. Keep your dialogue to 1-2 sentences maximum.
+    1. NEVER guess or assume what is in stock. Use the "search_database" action (Format A) to
+       verify items before answering any product-related question.
+    2. The "search_terms" list MUST contain ONLY individual product names that a grocery store
+       would carry (e.g., "flour", "eggs", "butter", "milk"). NEVER put recipe names, category
+       names, or multi-word phrases like "cake ingredients", "baking supplies", or "dairy products"
+       into search_terms — those will always return not found.
+       If the customer asks about a recipe or "ingredients for X", first think about the individual
+       products that recipe requires, then list each one separately in search_terms.
+    3. You may only output Format A once per conversation turn. As soon as you have Tool
+       Observations, you MUST output Format B. Do NOT issue another search_database action after
+       already receiving search results.
+    4. After receiving Tool Observations, honestly report what was found and what was not. If an
+       item is "not found in store inventory", tell the customer we do not carry it.
+    5. If search results confirm items in different aisles, include ALL relevant aisle numbers in
+       target_aisles (e.g. [1, 3]).
+    6. Keep your dialogue to 1-2 sentences maximum.
+
+    EXAMPLE — Customer asks: "Can you list the ingredients for a cake and where to find them?"
+      WRONG Format A:  {{"action": "search_database", "search_terms": ["Cake Ingredients"]}}
+      CORRECT Format A: {{"action": "search_database", "search_terms": ["flour", "eggs", "sugar", "butter", "baking powder", "milk"]}}
 
     {memory_text}
     {tool_obs_text}
@@ -174,13 +185,13 @@ def generate_shop_assistant_response(
 
     You MUST reply with ONLY valid JSON in one of the two formats below and nothing else.
 
-    Format A — to search the database before answering (use this when unsure about stock):
+    Format A — search the database (use ONLY when you have no Tool Observations yet):
     {{
       "action": "search_database",
-      "search_terms": ["<item1>", "<item2>"]
+      "search_terms": ["<individual product name 1>", "<individual product name 2>"]
     }}
 
-    Format B — final response to the customer (only after you have search results, or for
+    Format B — final response to the customer (use after receiving Tool Observations, or for
     greetings/general questions that do not require an inventory lookup):
     {{
       "dialogue": "<your response to the customer>",
@@ -188,9 +199,9 @@ def generate_shop_assistant_response(
       "target_aisles": [<aisle number(s) as integers, or empty list []>]
     }}
 
-    Use Format A when the customer asks about specific products or ingredients.
-    Use Format B with action "move" and target_aisles populated to direct the customer to aisles.
-    Use Format B with action "none" and empty target_aisles for greetings or when no movement needed.
+    Use Format A only when the customer asks about specific products or ingredients AND you have
+    not yet searched. Use Format B with action "move" to direct the customer to aisles. Use
+    Format B with action "none" for greetings, or when no movement is needed.
     """
 
     response = query_llm(prompt)
