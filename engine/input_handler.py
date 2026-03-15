@@ -23,68 +23,37 @@ def _build_inventory_summary(inventory):
 
 
 def _fetch_npc_response(npc, query, inventory, result_queue):
-    """Background worker: runs the ReAct agentic loop and puts the final result in result_queue.
+    """Background worker: pre-searches the inventory then generates a final response.
 
-    Loop (up to MAX_REACT_ITERATIONS times):
-      1. Call the LLM.
-      2. If the LLM returns action "search_database", execute the search against the
-         real inventory and append the result as a tool observation, then loop again.
-      3. When the LLM returns action "move" or "none" (a final response), put it in
-         the queue and return.
-
-    This eliminates hallucinations: the LLM must look up the actual data before
-    it can tell the customer whether an item is available or where to find it.
+    Flow:
+      1. Call ``extract_product_terms`` to convert the customer's query into
+         individual product names (handles recipe queries like "cake ingredients"
+         -> ["flour", "eggs", "sugar", ...]).
+      2. Search the inventory for those terms immediately, building
+         ``tool_observations`` before the main LLM call.
+      3. Call ``generate_shop_assistant_response`` once with the observations
+         already populated.  The LLM only needs to output a final Format B
+         answer — it never has to decide whether to search.
     """
-    from engine.llm_client import generate_shop_assistant_response
-
-    MAX_REACT_ITERATIONS = 3
+    from engine.llm_client import generate_shop_assistant_response, extract_product_terms
 
     inventory_summary = _build_inventory_summary(inventory)
     tool_observations = []
 
-    for _ in range(MAX_REACT_ITERATIONS):
-        result = generate_shop_assistant_response(
-            npc.name, query, inventory_summary, npc.memory, tool_observations
-        )
+    # Step 1: extract product terms and pre-search BEFORE calling the main LLM.
+    # This removes the "should I search?" decision from the main LLM and
+    # eliminates the loop that caused Mistral to search for "Cake Ingredients".
+    product_terms = extract_product_terms(query)
+    if product_terms:
+        observation = inventory.search_inventory(product_terms)
+        tool_observations.append(observation)
 
-        if result.get("action") == "search_database":
-            search_terms = result.get("search_terms", [])
-
-            # Safety guard: if we already have observations but the LLM is still
-            # trying to search, do not allow it to loop indefinitely. Break out
-            # and let the fallback message handle it.
-            if tool_observations:
-                print(
-                    "[ReAct] Warning: LLM issued a second 'search_database' action after "
-                    "observations were already provided. Stopping loop to avoid infinite cycle."
-                )
-                break
-
-            if search_terms:
-                observation = inventory.search_inventory(search_terms)
-                tool_observations.append(observation)
-            else:
-                # Guard against the LLM issuing an empty search that would
-                # silently waste an iteration without making progress.
-                tool_observations.append(
-                    "Tool Error: 'search_database' was requested with empty search_terms. "
-                    "Please provide a non-empty list of individual product names."
-                )
-            # Loop again with the new observation in context
-            continue
-
-        # Final response (action is "move" or "none")
-        result_queue.put(result)
-        return
-
-    # Fallback: max iterations reached without a conclusive response
-    result_queue.put(
-        {
-            "dialogue": "I'm having difficulty processing your request right now. Please try rephrasing your question.",
-            "action": "none",
-            "target_aisles": [],
-        }
+    # Step 2: single main LLM call to generate the customer-facing response.
+    result = generate_shop_assistant_response(
+        npc.name, query, inventory_summary, npc.memory, tool_observations
     )
+
+    result_queue.put(result)
 
 
 class InputHandler:
