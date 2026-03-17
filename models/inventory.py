@@ -93,6 +93,35 @@ class Inventory:
                     return product
         return None
 
+    def find_products_by_terms(self, search_terms):
+        """Return a de-duplicated list of in-stock product dicts that match any of the given terms.
+
+        Matching is the same substring/id logic used by ``search_inventory``.
+        This is a pure-Python, zero-LLM call that guarantees no hallucination.
+
+        Args:
+            search_terms: list of strings (e.g. ["milk", "cheese"])
+
+        Returns:
+            List of product dicts from the database (each has ``id``, ``name``,
+            ``price``, ``stock`` keys).
+        """
+        matched = []
+        seen_ids = set()
+        for term in search_terms:
+            term_lower = term.lower().strip()
+            for products in self.products.values():
+                for product in products:
+                    if product["id"] in seen_ids:
+                        continue
+                    if (
+                        term_lower in product["name"].lower()
+                        or term_lower in product["id"].lower()
+                    ) and product["stock"] > 0:
+                        matched.append(product)
+                        seen_ids.add(product["id"])
+        return matched
+
     def search_inventory(self, search_terms):
         """Search inventory for a list of search terms.
 

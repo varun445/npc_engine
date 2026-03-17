@@ -244,15 +244,16 @@ Customer just asked: "{customer_query}"
 
 Instructions:
 - Your answer MUST be based ONLY on the search results listed above.
-- For every item in the FOUND section: mention it by name and state its exact aisle number.
+- For every item in the FOUND section: tell the customer you are adding it to their cart
+  and state its exact aisle number (e.g. "I'm adding Milk (1L) to your cart — you'll find
+  it in Aisle 1!").
 - For every item in the NOT FOUND section: tell the customer we do not carry it.
 - If found items are in different aisles, list ALL those aisle numbers in target_aisles.
 - Keep your response to 1-2 sentences.
 
 ACTION RULES (follow exactly):
 - If the FOUND section above contains any items → set action to "move" and list every
-  found item's aisle number in target_aisles. Do this even if the customer only asked
-  where something is — your job is to physically guide them there.
+  found item's aisle number in target_aisles.
 - If the FOUND section is empty (all items not found, or no search was done) → set
   action to "none" and target_aisles to [].
 - NEVER set action to "none" when there are found items with aisle numbers.
@@ -358,7 +359,12 @@ def generate_cashier_response(cashier_name, customer_query, cart_items, memory):
         memory: List of past conversation turns for this NPC.
 
     Returns:
-        A dict with keys ``dialogue`` and ``action`` (``"none"`` or ``"checkout"``).
+        A dict with keys ``dialogue`` and ``action``:
+        - ``action`` is ``"checkout"`` when the customer requested payment and the
+          cart is non-empty; the game loop should clear the cart and the NPC's
+          memory when it receives this value.
+        - ``action`` is ``"none"`` in all other cases, including when the customer
+          tries to checkout with an empty cart (the cashier politely declines).
     """
     memory_text = ""
     if memory:
@@ -379,11 +385,18 @@ def generate_cashier_response(cashier_name, customer_query, cart_items, memory):
     else:
         cart_section = "Customer's cart is currently empty."
 
-    prompt = f"""You are {cashier_name}, a friendly cashier at a grocery store.
+    prompt = f"""You are {cashier_name}, a friendly cashier at a grocery store checkout.
 
 {memory_text}{cart_section}
 
 Customer just said: "{customer_query}"
+
+STRICT ROLE GUARDRAILS — you MUST follow these without exception:
+- You ONLY handle payments, cart review, and checkout. Nothing else.
+- You do NOT know store layout, aisle numbers, or where any product is located.
+  If a customer asks where to find a product or which aisle something is in, politely
+  explain that you only work at the register and suggest they ask the shop assistant.
+- NEVER mention aisle numbers or product locations in your response.
 
 Instructions:
 - If the customer wants to checkout, pay, or buy their items AND the cart is not empty:

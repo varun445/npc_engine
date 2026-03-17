@@ -50,14 +50,19 @@ def _fetch_npc_response(npc, query, inventory, result_queue):
         # This removes the "should I search?" decision from the main LLM and
         # eliminates the loop that caused Mistral to search for "Cake Ingredients".
         product_terms = extract_product_terms(query)
+        matched_products = []
         if product_terms:
             observation = inventory.search_inventory(product_terms)
             tool_observations.append(observation)
+            # Deterministic database lookup — zero hallucination.
+            matched_products = inventory.find_products_by_terms(product_terms)
 
         # Step 2: single main LLM call to generate the customer-facing response.
         result = generate_shop_assistant_response(
             npc.name, query, inventory_summary, npc.memory, tool_observations
         )
+        # Attach the verified product list so the game loop can add them to cart.
+        result["add_to_cart"] = matched_products
     except Exception as e:
         print(f"[NPC ERROR] Background thread failed: {type(e).__name__}: {e}")
         result = {"dialogue": "Sorry, I'm having trouble right now. Please try again later.", "action": "none", "target_aisles": []}

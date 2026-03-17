@@ -74,7 +74,15 @@ class Game:
         # Dispatch NPC action (e.g., move to one or more target aisles, or checkout)
         if self.ui_state.npc_action == "checkout":
             self.world.clear_player_cart()
+            # Clear cashier memory so the receipt doesn't leak into future conversations.
+            if npc:
+                npc.memory.clear()
         elif self.ui_state.npc_action == "move" and npc:
+            # Add database-verified products to the player's cart (no hallucination —
+            # these come from a pure-Python inventory lookup, not from the LLM).
+            for product in result.get("add_to_cart", []):
+                self.world.add_to_player_cart(product)
+
             target_aisles = result.get("target_aisles") or []
             # Backwards-compat: fall back to legacy single-value field
             if not target_aisles:

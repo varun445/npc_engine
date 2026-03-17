@@ -310,5 +310,7 @@ class UIManager:
             item_surf = self.font.render(label, True, (255, 255, 255))
             screen.blit(item_surf, (menu_x + 15, menu_y + 50 + i * row_height))
 
-        hint_surf = self.font.render("Press 1-9 to add to cart  |  ESC to close", True, (150, 150, 150))
+        num_items = len(items)
+        key_range = f"1-{num_items}" if num_items > 1 else "1"
+        hint_surf = self.font.render(f"Press {key_range} to add to cart  |  ESC to close", True, (150, 150, 150))
         screen.blit(hint_surf, (menu_x + 15, menu_y + menu_h - 24))
