@@ -2,6 +2,17 @@ import requests
 import json
 from models.inventory import SEARCH_RESULTS_PREFIX
 
+# Set to True to print a structured workflow trace to the terminal.
+# Logs each step with a concise summary.  Raw prompts and the full Ollama
+# API response body (eval counts, timings, etc.) are never printed.
+DEBUG = False
+
+
+def _log(msg):
+    """Print a debug line to stdout only when DEBUG is enabled."""
+    if DEBUG:
+        print(f"[DEBUG] {msg}")
+
 
 def query_llm(prompt):
     """Send a prompt to the local Ollama/Mistral model and return the text response."""
@@ -62,10 +73,13 @@ Customer query: "{customer_query}"
         data = json.loads(response)
         terms = data.get("terms", [])
         if isinstance(terms, list):
-            return [str(t).strip() for t in terms if t]
-        return []
+            terms = [str(t).strip() for t in terms if t]
+        else:
+            terms = []
     except json.JSONDecodeError:
-        return []
+        terms = []
+    _log(f"  terms extracted  → {terms}")
+    return terms
 
 
 def _format_search_observations(tool_observations):
@@ -196,8 +210,10 @@ Reply with ONLY valid JSON in this exact format and nothing else:
         # A model may correctly identify aisles but forget to set the action.
         if result["target_aisles"] and result.get("action") != "move":
             result["action"] = "move"
+        _log(f"  assistant result → action={result['action']} | aisles={result['target_aisles']} | \"{result.get('dialogue', '')[:80]}\"")
         return result
     except json.JSONDecodeError:
+        _log(f"  assistant result → JSON parse failed; raw={response[:80]}")
         return {"dialogue": response, "action": "none", "target_aisles": []}
 
 
@@ -283,7 +299,9 @@ Reply with ONLY valid JSON in this exact format and nothing else:
         # Safety: prevent checkout of an empty cart
         if result.get("action") == "checkout" and not cart_items:
             result["action"] = "none"
+        _log(f"  cashier result  → action={result['action']} | \"{result.get('dialogue', '')[:80]}\"")
         return result
     except json.JSONDecodeError:
+        _log(f"  cashier result  → JSON parse failed; raw={response[:80]}")
         return {"dialogue": response, "action": "none"}
 

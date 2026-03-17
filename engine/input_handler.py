@@ -2,6 +2,7 @@ import pygame
 import threading
 
 from world.npc import Cashier
+from engine.llm_client import DEBUG
 
 MAX_MEMORY_TURNS = 5
 
@@ -43,6 +44,10 @@ def _fetch_npc_response(npc, query, inventory, result_queue):
     try:
         from engine.llm_client import generate_shop_assistant_response, extract_product_terms
 
+        if DEBUG:
+            print(f"[DEBUG] ── {npc.role} ({npc.name}) {'─' * 40}")
+            print(f"[DEBUG]   query          : {query!r}")
+
         inventory_summary = _build_inventory_summary(inventory)
         tool_observations = []
 
@@ -56,6 +61,12 @@ def _fetch_npc_response(npc, query, inventory, result_queue):
             tool_observations.append(observation)
             # Deterministic database lookup — zero hallucination.
             matched_products = inventory.find_products_by_terms(product_terms)
+            if DEBUG:
+                from models.inventory import SEARCH_RESULTS_PREFIX
+                summary = observation[len(SEARCH_RESULTS_PREFIX):] if observation.startswith(SEARCH_RESULTS_PREFIX) else observation
+                print(f"[DEBUG]   inventory      : {summary}")
+        elif DEBUG:
+            print(f"[DEBUG]   inventory      : (no product terms — skipped)")
 
         # Step 2: single main LLM call to generate the customer-facing response.
         result = generate_shop_assistant_response(
@@ -63,6 +74,10 @@ def _fetch_npc_response(npc, query, inventory, result_queue):
         )
         # Attach the verified product list so the game loop can add them to cart.
         result["add_to_cart"] = matched_products
+
+        if DEBUG:
+            print(f"[DEBUG]   cart additions : {len(matched_products)} item(s)")
+            print(f"[DEBUG] {'─' * 56}")
     except Exception as e:
         print(f"[NPC ERROR] Background thread failed: {type(e).__name__}: {e}")
         result = {"dialogue": "Sorry, I'm having trouble right now. Please try again later.", "action": "none", "target_aisles": []}
@@ -80,7 +95,17 @@ def _fetch_cashier_response(npc, query, world_manager, result_queue):
         from engine.llm_client import generate_cashier_response
 
         cart_items = list(world_manager.player_cart)
+
+        if DEBUG:
+            total = sum(item["price"] for item in cart_items)
+            print(f"[DEBUG] ── {npc.role} ({npc.name}) {'─' * 40}")
+            print(f"[DEBUG]   query          : {query!r}")
+            print(f"[DEBUG]   cart           : {len(cart_items)} item(s), total ${total:.2f}")
+
         result = generate_cashier_response(npc.name, query, cart_items, npc.memory)
+
+        if DEBUG:
+            print(f"[DEBUG] {'─' * 56}")
     except Exception as e:
         print(f"[CASHIER ERROR] Background thread failed: {type(e).__name__}: {e}")
         result = {"dialogue": "Sorry, I'm having trouble at the register. Please try again.", "action": "none"}
