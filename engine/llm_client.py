@@ -3,8 +3,10 @@ import json
 from models.inventory import SEARCH_RESULTS_PREFIX
 
 # Set to True to print a structured workflow trace to the terminal.
-# Logs each step with a concise summary.  Raw prompts and the full Ollama
-# API response body (eval counts, timings, etc.) are never printed.
+# Each LLM call logs the full prompt sent to Ollama and the raw text
+# response returned by it, plus per-step summaries (terms, action, aisles,
+# dialogue snippet).  The full Ollama API metadata (eval counts, timings,
+# etc.) is never printed — only the text "response" field is shown.
 DEBUG = False
 
 
@@ -16,6 +18,11 @@ def _log(msg):
 
 def query_llm(prompt):
     """Send a prompt to the local Ollama/Mistral model and return the text response."""
+    if DEBUG:
+        print(f"[DEBUG] ┌─ PROMPT ───────────────────────────────────────────────────────")
+        for line in prompt.splitlines():
+            print(f"[DEBUG] │ {line}")
+        print(f"[DEBUG] └────────────────────────────────────────────────────────────────")
     try:
         response = requests.post(
             "http://localhost:11434/api/generate",
@@ -25,7 +32,13 @@ def query_llm(prompt):
                 "stream": False,
             },
         )
-        return response.json()["response"]
+        text = response.json()["response"]
+        if DEBUG:
+            print(f"[DEBUG] ┌─ RESPONSE ─────────────────────────────────────────────────")
+            for line in text.splitlines():
+                print(f"[DEBUG] │ {line}")
+            print(f"[DEBUG] └────────────────────────────────────────────────────────────")
+        return text
     except Exception as e:
         return f"[LLM Error: {e}]"
 
