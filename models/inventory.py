@@ -56,12 +56,7 @@ class Inventory:
     def __init__(self):
         self.products = PRODUCTS
         self.aisles = AISLE_LOCATIONS
-        self.current_promotions = [
-            ("milk", 0.50),
-            ("bread_white", 0.25),
-            ("apple", 0.10),
-        ]
-    
+
     def find_product(self, product_name):
         """Find a product by name across all categories"""
         product_name_lower = product_name.lower()

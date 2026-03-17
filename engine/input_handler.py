@@ -228,5 +228,4 @@ class InputHandler:
         elif event.key == pygame.K_t:
             self.world.world_state["store_busy"] = not self.world.world_state["store_busy"]
         elif event.key == pygame.K_c:
-            if ui_state.active_npc:
-                ui_state.active_npc.clear_cart()
+            self.world.clear_player_cart()
