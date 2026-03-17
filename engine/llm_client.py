@@ -144,6 +144,11 @@ def generate_shop_assistant_response(
     results are sufficient and sending the entire catalogue adds noise that
     causes small models to overlook found items.
 
+    When *tool_observations* is empty (conversational query — no products were
+    identified by the pre-processing step), a lightweight conversational prompt
+    is used instead so the assistant can respond naturally without being
+    constrained by non-existent search results.
+
     Returns a dict with keys: ``dialogue``, ``action``, ``target_aisles``.
     """
     memory_text = ""
@@ -155,12 +160,41 @@ def generate_shop_assistant_response(
                 if msg["role"] == "customer"
                 else f"You: {msg['content']}\n"
             )
+        memory_text += "\n"
 
-    # Build two explicit sections so the LLM cannot overlook found items.
-    search_section = ""
-    if tool_observations:
+    # Shared preamble used in both prompt branches.
+    preamble = f"You are {assistant_name}, a friendly and helpful shop assistant in a grocery store."
+
+    # ------------------------------------------------------------------ #
+    # Conversational path — no product search was performed.              #
+    # Use a simple prompt that lets the assistant respond naturally.       #
+    # ------------------------------------------------------------------ #
+    if not tool_observations:
+        prompt = f"""{preamble}
+
+{memory_text}Customer just said: "{customer_query}"
+
+Instructions:
+- Respond naturally and helpfully as a shop assistant.
+- You help customers find products, answer general questions about the store, and direct them to the right aisles when asked.
+- If the customer asks what you can do or how you can help, explain that you can help them find products and add items to their cart.
+- Keep your response to 1-3 sentences.
+- Do NOT invent specific products or aisle numbers — the customer should ask for a specific product if they want you to find it.
+
+Reply with ONLY valid JSON in this exact format and nothing else:
+{{
+  "dialogue": "<your response to the customer>",
+  "action": "none",
+  "target_aisles": []
+}}
+"""
+    else:
+        # ------------------------------------------------------------------ #
+        # Product-search path — build FOUND / NOT FOUND sections.            #
+        # ------------------------------------------------------------------ #
         found_lines, not_found_names = _format_search_observations(tool_observations)
 
+        search_section = ""
         if found_lines:
             search_section += "\n*** ITEMS WE CARRY (you MUST tell the customer about each one with its aisle number) ***\n"
             for line in found_lines:
@@ -171,7 +205,7 @@ def generate_shop_assistant_response(
             for name in not_found_names:
                 search_section += f"  NOT FOUND: {name}\n"
 
-    prompt = f"""You are {assistant_name}, a friendly and helpful shop assistant in a grocery store.
+        prompt = f"""{preamble}
 
 {memory_text}{search_section}
 Customer just asked: "{customer_query}"
@@ -221,6 +255,8 @@ Reply with ONLY valid JSON in this exact format and nothing else:
                 result["target_aisles"] = []
         # Safeguard: if aisles are populated the action must be "move".
         # A model may correctly identify aisles but forget to set the action.
+        # (The conversational path hardcodes target_aisles=[] so this never
+        # fires there — it is only relevant for the product-search path.)
         if result["target_aisles"] and result.get("action") != "move":
             result["action"] = "move"
         _log(f"  assistant result → action={result['action']} | aisles={result['target_aisles']} | \"{result.get('dialogue', '')[:80]}\"")
