@@ -6,7 +6,7 @@ from engine.game import Game
 from engine.input_handler import InputHandler
 from models.inventory import Inventory
 from ui.ui_manager import UIManager
-from world.npc import ShopAssistant
+from world.npc import Cashier, ShopAssistant
 from world.world_manager import WorldManager
 
 
@@ -31,6 +31,15 @@ def main():
         inventory=inventory,
     )
     world.add_npc(shop_assistant)
+
+    cashier = Cashier(
+        name="Bob",
+        row=18,
+        col=18,
+        color=(100, 100, 255),
+        interaction_range=3,
+    )
+    world.add_npc(cashier)
 
     ui = UIManager(width=WIDTH, height=HEIGHT, cell_size=CELL_SIZE)
     input_handler = InputHandler(

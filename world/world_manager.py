@@ -67,6 +67,7 @@ class WorldManager:
             "store_busy": False,
             "current_time": "day",
         }
+        self.player_cart = []
 
     # ------------------------------------------------------------------
     # Obstacle helpers
@@ -112,6 +113,32 @@ class WorldManager:
                     min_dist = distance
                     closest = npc
         return interactable, closest
+
+    def get_nearby_aisle(self):
+        """Return the nearest aisle within 1 step of the player, or None."""
+        for aisle in self.aisles:
+            start_col, start_row, end_col, end_row = aisle["grid_rect"]
+            for r in range(start_row, end_row + 1):
+                for c in range(start_col, end_col + 1):
+                    if abs(self.player_row - r) + abs(self.player_col - c) <= 1:
+                        return aisle
+        return None
+
+    # ------------------------------------------------------------------
+    # Player cart management
+    # ------------------------------------------------------------------
+
+    def add_to_player_cart(self, item):
+        """Add a product dict to the player's cart."""
+        self.player_cart.append(item)
+
+    def get_cart_total(self):
+        """Return the total price of all items in the player's cart."""
+        return sum(item["price"] for item in self.player_cart)
+
+    def clear_player_cart(self):
+        """Clear the player's cart."""
+        self.player_cart = []
 
     # ------------------------------------------------------------------
     # Player movement (obstacle-aware)

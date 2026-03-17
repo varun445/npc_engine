@@ -17,6 +17,10 @@ class UIState:
         self.show_npc_response = False
         self.response_scroll_offset = 0
         self.input_scroll_offset = 0
+        # Aisle browsing menu
+        self.aisle_menu_open = False
+        self.active_aisle = None
+        self.aisle_menu_items = []
 
     def reset_dialogue(self):
         """Fully exit dialogue mode and clear all related state."""
@@ -30,6 +34,9 @@ class UIState:
         self.show_npc_response = False
         self.response_scroll_offset = 0
         self.input_scroll_offset = 0
+        self.aisle_menu_open = False
+        self.active_aisle = None
+        self.aisle_menu_items = []
 
     def reset_for_next_message(self):
         """Keep dialogue open but clear the current exchange for a new query."""
@@ -64,7 +71,10 @@ class UIManager:
     def draw(self, screen, world_manager, interactable_npcs, ui_state):
         """Draw the full frame: world entities and, if open, the dialogue panel."""
         self._draw_world(screen, world_manager, interactable_npcs)
-        if ui_state.in_dialogue and ui_state.active_npc is not None:
+        self._draw_cart_hud(screen, world_manager)
+        if ui_state.aisle_menu_open:
+            self._draw_aisle_menu(screen, ui_state)
+        elif ui_state.in_dialogue and ui_state.active_npc is not None:
             self._draw_dialogue_panel(screen, ui_state)
 
     # ------------------------------------------------------------------
@@ -131,8 +141,11 @@ class UIManager:
         pygame.draw.rect(screen, (20, 20, 20), panel_rect)
         pygame.draw.rect(screen, (200, 200, 200), panel_rect, 2)
 
+        npc = ui_state.active_npc
+        role = getattr(npc, "role", "NPC")
+        name_color = getattr(npc, "name_color", (200, 200, 200))
         name_surface = self.font.render(
-            ui_state.active_npc.name + " (Shop Assistant)", True, (0, 200, 100)
+            f"{npc.name} ({role})", True, name_color
         )
         screen.blit(name_surface, (self.PADDING, panel_y + 10))
 
@@ -244,3 +257,58 @@ class UIManager:
                 self.font.render(instruction, True, (150, 150, 150)),
                 (panel_x + self.PADDING, self.height - 25),
             )
+
+    # ------------------------------------------------------------------
+    # Cart HUD
+    # ------------------------------------------------------------------
+
+    def _draw_cart_hud(self, screen, world_manager):
+        """Draw a small HUD in the top-right corner showing cart item count and total."""
+        item_count = len(world_manager.player_cart)
+        total = world_manager.get_cart_total()
+
+        hud_w = 185
+        hud_h = 52
+        hud_x = self.width - hud_w - 8
+        hud_y = 8
+
+        pygame.draw.rect(screen, (40, 40, 40), (hud_x, hud_y, hud_w, hud_h))
+        pygame.draw.rect(screen, (200, 200, 200), (hud_x, hud_y, hud_w, hud_h), 2)
+
+        count_surf = self.font.render(f"Cart: {item_count} item(s)", True, (255, 255, 255))
+        total_surf = self.font.render(f"Total: ${total:.2f}", True, (0, 220, 130))
+        screen.blit(count_surf, (hud_x + 10, hud_y + 8))
+        screen.blit(total_surf, (hud_x + 10, hud_y + 28))
+
+    # ------------------------------------------------------------------
+    # Aisle menu
+    # ------------------------------------------------------------------
+
+    def _draw_aisle_menu(self, screen, ui_state):
+        """Draw the interactive aisle browsing menu."""
+        items = ui_state.aisle_menu_items
+        aisle = ui_state.active_aisle
+
+        row_height = 28
+        menu_w = 420
+        menu_h = 80 + len(items) * row_height
+        menu_x = (self.width - menu_w) // 2
+        menu_y = (self.height - menu_h) // 2
+
+        pygame.draw.rect(screen, (20, 20, 20), (menu_x, menu_y, menu_w, menu_h))
+        pygame.draw.rect(screen, (200, 200, 200), (menu_x, menu_y, menu_w, menu_h), 2)
+
+        title_text = f"Aisle {aisle['id']}: {aisle['name']}"
+        title_surf = self.font.render(title_text, True, (255, 220, 60))
+        screen.blit(title_surf, (menu_x + 15, menu_y + 14))
+
+        sep_y = menu_y + 40
+        pygame.draw.line(screen, (120, 120, 120), (menu_x + 10, sep_y), (menu_x + menu_w - 10, sep_y))
+
+        for i, item in enumerate(items):
+            label = f"{i + 1}. {item['name']}  —  ${item['price']:.2f}"
+            item_surf = self.font.render(label, True, (255, 255, 255))
+            screen.blit(item_surf, (menu_x + 15, menu_y + 50 + i * row_height))
+
+        hint_surf = self.font.render("Press 1-9 to add to cart  |  ESC to close", True, (150, 150, 150))
+        screen.blit(hint_surf, (menu_x + 15, menu_y + menu_h - 24))

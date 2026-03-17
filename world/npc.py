@@ -13,6 +13,8 @@ class NPC:
         self.static_dialogue = static_dialogue
         self.personality = personality
         self.memory = []
+        self.role = "NPC"
+        self.name_color = (200, 200, 200)
         # Path-following state
         self.path = []                # list of (row, col) steps remaining
         self.path_timer = 0           # counts frames since last step
@@ -59,6 +61,8 @@ class ShopAssistant(NPC):
             "Let me help you find what you need."
         ]
         super().__init__(name, row, col, color, interaction_range, static_dialogue, personality)
+        self.role = "Shop Assistant"
+        self.name_color = (0, 200, 100)
         self.inventory = inventory
         self.customer_cart = []
         self.conversation_count = 0
@@ -79,3 +83,18 @@ class ShopAssistant(NPC):
             if product:
                 total += product["price"]
         return total
+
+
+class Cashier(NPC):
+    """A stationary cashier NPC that handles checkout."""
+
+    def __init__(self, name, row, col, color, interaction_range):
+        personality = "A professional, efficient cashier who processes payments and helps customers checkout. Friendly, accurate with prices, and focused on completing transactions smoothly."
+        static_dialogue = [
+            "Ready to checkout when you are!",
+            "Did you find everything you needed?",
+            "I can help you with your purchase.",
+        ]
+        super().__init__(name, row, col, color, interaction_range, static_dialogue, personality)
+        self.role = "Cashier"
+        self.name_color = (100, 150, 255)

@@ -343,4 +343,76 @@ def generate_product_recommendation(customer_preferences, available_products):
         return {"recommendations": []}
 
 
+def generate_cashier_response(cashier_name, customer_query, cart_items, memory):
+    """Generate a response for the Cashier NPC.
+
+    The cashier always receives the full current cart so it never has to
+    guess prices or item names.  If the customer asks to checkout / pay, the
+    cashier returns ``{"action": "checkout", ...}`` so the game loop can clear
+    the cart.  For all other queries the action is ``"none"``.
+
+    Args:
+        cashier_name: Name of the cashier NPC.
+        customer_query: The raw text typed by the customer.
+        cart_items: List of product dicts from ``world_manager.player_cart``.
+        memory: List of past conversation turns for this NPC.
+
+    Returns:
+        A dict with keys ``dialogue`` and ``action`` (``"none"`` or ``"checkout"``).
+    """
+    memory_text = ""
+    if memory:
+        memory_text = "Previous conversation:\n"
+        for msg in memory:
+            memory_text += (
+                f"Customer: {msg['content']}\n"
+                if msg["role"] == "customer"
+                else f"You: {msg['content']}\n"
+            )
+
+    if cart_items:
+        total = sum(item["price"] for item in cart_items)
+        cart_lines = "\n".join(
+            f"  - {item['name']}: ${item['price']:.2f}" for item in cart_items
+        )
+        cart_section = f"Customer's cart:\n{cart_lines}\n  TOTAL: ${total:.2f}"
+    else:
+        cart_section = "Customer's cart is currently empty."
+
+    prompt = f"""You are {cashier_name}, a friendly cashier at a grocery store.
+
+{memory_text}{cart_section}
+
+Customer just said: "{customer_query}"
+
+Instructions:
+- If the customer wants to checkout, pay, or buy their items AND the cart is not empty:
+  set action to "checkout" and provide a receipt-style dialogue that lists every item
+  and states the final total.
+- If the cart is empty and the customer tries to checkout: politely tell them the cart
+  is empty and set action to "none".
+- For all other requests (viewing cart, questions, greetings): describe the cart contents
+  and total if relevant, and set action to "none".
+- Keep your response concise (1-4 sentences).
+
+Reply with ONLY valid JSON in this exact format and nothing else:
+{{
+  "dialogue": "<your response to the customer>",
+  "action": "<none or checkout>"
+}}
+"""
+
+    response = query_llm(prompt)
+    try:
+        result = json.loads(response)
+        if "dialogue" not in result:
+            result["dialogue"] = response
+        if "action" not in result:
+            result["action"] = "none"
+        # Safety: prevent checkout of an empty cart
+        if result.get("action") == "checkout" and not cart_items:
+            result["action"] = "none"
+        return result
+    except json.JSONDecodeError:
+        return {"dialogue": response, "action": "none"}
 

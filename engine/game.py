@@ -71,8 +71,10 @@ class Game:
                 if len(npc.memory) > MAX_MEMORY_TURNS * 2:
                     npc.memory = npc.memory[-MAX_MEMORY_TURNS * 2 :]
 
-        # Dispatch NPC action (e.g., move to one or more target aisles)
-        if self.ui_state.npc_action == "move" and npc:
+        # Dispatch NPC action (e.g., move to one or more target aisles, or checkout)
+        if self.ui_state.npc_action == "checkout":
+            self.world.clear_player_cart()
+        elif self.ui_state.npc_action == "move" and npc:
             target_aisles = result.get("target_aisles") or []
             # Backwards-compat: fall back to legacy single-value field
             if not target_aisles:

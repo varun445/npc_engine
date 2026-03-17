@@ -1,6 +1,8 @@
 import pygame
 import threading
 
+from world.npc import Cashier
+
 MAX_MEMORY_TURNS = 5
 
 
@@ -63,6 +65,24 @@ def _fetch_npc_response(npc, query, inventory, result_queue):
     result_queue.put(result)
 
 
+def _fetch_cashier_response(npc, query, world_manager, result_queue):
+    """Background worker for the Cashier NPC.
+
+    Passes the current player cart to the cashier LLM so it can view items
+    or process checkout without hallucinating inventory.
+    """
+    try:
+        from engine.llm_client import generate_cashier_response
+
+        cart_items = list(world_manager.player_cart)
+        result = generate_cashier_response(npc.name, query, cart_items, npc.memory)
+    except Exception as e:
+        print(f"[CASHIER ERROR] Background thread failed: {type(e).__name__}: {e}")
+        result = {"dialogue": "Sorry, I'm having trouble at the register. Please try again.", "action": "none"}
+
+    result_queue.put(result)
+
+
 class InputHandler:
     """Routes pygame events to the correct handler based on the current game state."""
 
@@ -93,6 +113,8 @@ class InputHandler:
             self._handle_text_input(event, ui_state)
         elif ui_state.in_dialogue:
             self._handle_dialogue_keys(event, ui_state)
+        elif ui_state.aisle_menu_open:
+            self._handle_aisle_menu(event, ui_state)
         else:
             self._handle_free_roam(event, ui_state, closest_npc)
 
@@ -116,11 +138,18 @@ class InputHandler:
                 if ui_state.active_npc:
                     ui_state.active_npc.memory.append({"role": "customer", "content": query})
 
-                threading.Thread(
-                    target=_fetch_npc_response,
-                    args=(ui_state.active_npc, query, self.inventory, self.result_queue),
-                    daemon=True,
-                ).start()
+                if isinstance(ui_state.active_npc, Cashier):
+                    threading.Thread(
+                        target=_fetch_cashier_response,
+                        args=(ui_state.active_npc, query, self.world, self.result_queue),
+                        daemon=True,
+                    ).start()
+                else:
+                    threading.Thread(
+                        target=_fetch_npc_response,
+                        args=(ui_state.active_npc, query, self.inventory, self.result_queue),
+                        daemon=True,
+                    ).start()
 
         elif event.key == pygame.K_ESCAPE:
             ui_state.reset_dialogue()
@@ -149,6 +178,18 @@ class InputHandler:
         elif event.key == pygame.K_DOWN:
             ui_state.response_scroll_offset += 1
 
+    def _handle_aisle_menu(self, event, ui_state):
+        """Handle key presses while the aisle browsing menu is open."""
+        if event.key == pygame.K_ESCAPE:
+            ui_state.aisle_menu_open = False
+            ui_state.active_aisle = None
+            ui_state.aisle_menu_items = []
+        elif pygame.K_1 <= event.key <= pygame.K_9:
+            index = event.key - pygame.K_1
+            if index < len(ui_state.aisle_menu_items):
+                item = ui_state.aisle_menu_items[index]
+                self.world.add_to_player_cart(item)
+
     def _handle_free_roam(self, event, ui_state, closest_npc):
         if event.key == pygame.K_UP:
             self.world.move_player("up")
@@ -170,6 +211,15 @@ class InputHandler:
                 ui_state.show_npc_response = False
                 ui_state.response_scroll_offset = 0
                 ui_state.input_scroll_offset = 0
+            else:
+                nearby_aisle = self.world.get_nearby_aisle()
+                if nearby_aisle is not None:
+                    aisle_items = []
+                    for category in nearby_aisle["categories"]:
+                        aisle_items.extend(self.inventory.get_category_products(category))
+                    ui_state.aisle_menu_open = True
+                    ui_state.active_aisle = nearby_aisle
+                    ui_state.aisle_menu_items = aisle_items
         elif event.key == pygame.K_t:
             self.world.world_state["store_busy"] = not self.world.world_state["store_busy"]
         elif event.key == pygame.K_c:
