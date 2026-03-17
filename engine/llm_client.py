@@ -11,8 +11,7 @@ def query_llm(prompt):
                 "model": "mistral",
                 "prompt": prompt,
                 "stream": False
-            },
-            timeout=120,
+            }
         )
         if DEBUG_LLM:
             print(prompt)
