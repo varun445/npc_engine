@@ -65,11 +65,19 @@ class Game:
 
         npc = self.ui_state.active_npc
         if npc and self.ui_state.npc_response:
-            last = npc.memory[-1] if npc.memory else None
-            if last != {"role": "assistant", "content": self.ui_state.npc_response}:
-                npc.memory.append({"role": "assistant", "content": self.ui_state.npc_response})
-                if len(npc.memory) > MAX_MEMORY_TURNS * 2:
-                    npc.memory = npc.memory[-MAX_MEMORY_TURNS * 2 :]
+            # Store the customer turn first.  It was intentionally kept out of
+            # memory until now so that the LLM prompt never sees the current
+            # query in both the "Previous conversation" block and the
+            # "Customer just asked/said" line.
+            if self.ui_state.customer_query:
+                customer_msg = {"role": "customer", "content": self.ui_state.customer_query}
+                if not npc.memory or npc.memory[-1] != customer_msg:
+                    npc.memory.append(customer_msg)
+            asst_msg = {"role": "assistant", "content": self.ui_state.npc_response}
+            if not npc.memory or npc.memory[-1] != asst_msg:
+                npc.memory.append(asst_msg)
+            if len(npc.memory) > MAX_MEMORY_TURNS * 2:
+                npc.memory = npc.memory[-MAX_MEMORY_TURNS * 2 :]
 
         # Dispatch NPC action (e.g., move to one or more target aisles, or checkout)
         if self.ui_state.npc_action == "checkout":

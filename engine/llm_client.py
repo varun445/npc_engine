@@ -298,6 +298,7 @@ def generate_cashier_response(cashier_name, customer_query, cart_items, memory):
                 if msg["role"] == "customer"
                 else f"You: {msg['content']}\n"
             )
+        memory_text += "\n"
 
     if cart_items:
         total = sum(item["price"] for item in cart_items)
@@ -320,15 +321,20 @@ STRICT ROLE GUARDRAILS — you MUST follow these without exception:
   If a customer asks where to find a product or which aisle something is in, politely
   explain that you only work at the register and suggest they ask the shop assistant.
 - NEVER mention aisle numbers or product locations in your response.
+- NEVER describe, list, or mention any item that is NOT shown in the cart above.
+  You MUST only report what is literally in the cart section above.
 
 Instructions:
 - If the customer wants to checkout, pay, or buy their items AND the cart is not empty:
   set action to "checkout" and provide a receipt-style dialogue that lists every item
-  and states the final total.
-- If the cart is empty and the customer tries to checkout: politely tell them the cart
-  is empty and set action to "none".
-- For all other requests (viewing cart, questions, greetings): describe the cart contents
-  and total if relevant, and set action to "none".
+  from the cart and states the final total.
+- If the cart is empty and the customer tries to checkout or pay: politely tell them their
+  cart is empty and set action to "none".
+- If the customer mentions a specific product they want to buy but that product is NOT
+  in their cart: explain that their cart does not contain that item and they should ask
+  the shop assistant to help them find it first. Set action to "none".
+- For all other requests (viewing cart, questions, greetings): describe only the items
+  actually in the cart above and set action to "none".
 - Keep your response concise (1-4 sentences).
 
 Reply with ONLY valid JSON in this exact format and nothing else:

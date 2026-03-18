@@ -165,9 +165,6 @@ class InputHandler:
                 ui_state.input_scroll_offset = 0
                 ui_state.is_waiting_for_llm = True
 
-                if ui_state.active_npc:
-                    ui_state.active_npc.memory.append({"role": "customer", "content": query})
-
                 if isinstance(ui_state.active_npc, Cashier):
                     threading.Thread(
                         target=_fetch_cashier_response,
