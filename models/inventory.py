@@ -88,6 +88,19 @@ class Inventory:
                     return product
         return None
 
+    def decrement_stock(self, product_id, quantity=1):
+        """Reduce the stock of a product by the given quantity (minimum 0).
+
+        Args:
+            product_id: The ``id`` string of the product to decrement.
+            quantity: How many units to remove (default 1).
+        """
+        for products in self.products.values():
+            for product in products:
+                if product["id"] == product_id:
+                    product["stock"] = max(0, product["stock"] - quantity)
+                    return
+
     def find_products_by_terms(self, search_terms):
         """Return a de-duplicated list of in-stock product dicts that match any of the given terms.
 
