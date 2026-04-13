@@ -546,10 +546,19 @@ def _build_inventory_summary(inventory: Inventory) -> str:
                 )
     return "Store inventory:\n" + "\n".join(lines)
 
-
 # ---------------------------------------------------------------------------
 # Reporting helpers
 # ---------------------------------------------------------------------------
+
+def _pct(count: int, total: int) -> float:
+    """Return *count* as a percentage of *total*, or 0.0 when *total* is zero."""
+    return count / total * 100 if total else 0.0
+
+
+def _mean(values: list) -> float:
+    """Return the arithmetic mean of *values*, or 0.0 for an empty list."""
+    return sum(values) / len(values) if values else 0.0
+
 
 def _compute_summary(results: list[dict]) -> dict:
     n = len(results)
@@ -626,14 +635,11 @@ def _print_summary(summary: dict) -> None:
         print("  " + "─" * 58)
         for mode_name, stats in summary["by_mode"].items():
             t = stats["total"]
-            success_pct = stats["success"] / t * 100 if t else 0
-            hall_pct = stats["hallucinated"] / t * 100 if t else 0
-            lat_mean = sum(stats["latencies"]) / len(stats["latencies"]) if stats["latencies"] else 0
             print(
                 f"  {mode_name:<12} {t:>7}"
-                f" {success_pct:>8.1f}%"
-                f" {hall_pct:>13.1f}%"
-                f" {lat_mean:>13.3f}s"
+                f" {_pct(stats['success'], t):>8.1f}%"
+                f" {_pct(stats['hallucinated'], t):>13.1f}%"
+                f" {_mean(stats['latencies']):>13.3f}s"
             )
 
     print()
@@ -642,12 +648,11 @@ def _print_summary(summary: dict) -> None:
     print(header)
     print("  " + "─" * 50)
     for qt, stats in summary["by_query_type"].items():
-        success_pct = stats["success"] / stats["total"] * 100 if stats["total"] else 0
-        hall_pct = stats["hallucinated"] / stats["total"] * 100 if stats["total"] else 0
+        t = stats["total"]
         print(
-            f"  {qt:<16} {stats['total']:>7}"
-            f" {success_pct:>8.1f}%"
-            f" {hall_pct:>13.1f}%"
+            f"  {qt:<16} {t:>7}"
+            f" {_pct(stats['success'], t):>8.1f}%"
+            f" {_pct(stats['hallucinated'], t):>13.1f}%"
         )
     print(sep)
 
@@ -689,14 +694,11 @@ def _save_summary(summary: dict, output_dir: str, timestamp: str) -> str:
         ]
         for mode_name, stats in summary["by_mode"].items():
             t = stats["total"]
-            success_pct = stats["success"] / t * 100 if t else 0
-            hall_pct = stats["hallucinated"] / t * 100 if t else 0
-            lat_mean = sum(stats["latencies"]) / len(stats["latencies"]) if stats["latencies"] else 0
             lines.append(
                 f"  {mode_name:<12} {t:>7}"
-                f" {success_pct:>8.1f}%"
-                f" {hall_pct:>13.1f}%"
-                f" {lat_mean:>13.3f}s"
+                f" {_pct(stats['success'], t):>8.1f}%"
+                f" {_pct(stats['hallucinated'], t):>13.1f}%"
+                f" {_mean(stats['latencies']):>13.3f}s"
             )
 
     lines += [
@@ -706,12 +708,11 @@ def _save_summary(summary: dict, output_dir: str, timestamp: str) -> str:
         "  " + "─" * 50,
     ]
     for qt, stats in summary["by_query_type"].items():
-        success_pct = stats["success"] / stats["total"] * 100 if stats["total"] else 0
-        hall_pct = stats["hallucinated"] / stats["total"] * 100 if stats["total"] else 0
+        t = stats["total"]
         lines.append(
-            f"  {qt:<16} {stats['total']:>7}"
-            f" {success_pct:>8.1f}%"
-            f" {hall_pct:>13.1f}%"
+            f"  {qt:<16} {t:>7}"
+            f" {_pct(stats['success'], t):>8.1f}%"
+            f" {_pct(stats['hallucinated'], t):>13.1f}%"
         )
     with open(summary_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
