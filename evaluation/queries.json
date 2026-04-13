@@ -1,0 +1,302 @@
+[
+  {
+    "id": 1,
+    "query": "Where can I find milk?",
+    "query_type": "direct",
+    "expected_items": ["milk"]
+  },
+  {
+    "id": 2,
+    "query": "Do you have cheddar cheese?",
+    "query_type": "direct",
+    "expected_items": ["cheese"]
+  },
+  {
+    "id": 3,
+    "query": "I need some apples please",
+    "query_type": "direct",
+    "expected_items": ["apple"]
+  },
+  {
+    "id": 4,
+    "query": "Can I get a loaf of white bread?",
+    "query_type": "direct",
+    "expected_items": ["bread"]
+  },
+  {
+    "id": 5,
+    "query": "I would like some orange juice",
+    "query_type": "direct",
+    "expected_items": ["juice"]
+  },
+  {
+    "id": 6,
+    "query": "Where are the potato chips?",
+    "query_type": "direct",
+    "expected_items": ["chips"]
+  },
+  {
+    "id": 7,
+    "query": "Can you help me find bottled water?",
+    "query_type": "direct",
+    "expected_items": ["water"]
+  },
+  {
+    "id": 8,
+    "query": "I need a banana",
+    "query_type": "direct",
+    "expected_items": ["banana"]
+  },
+  {
+    "id": 9,
+    "query": "Do you sell croissants?",
+    "query_type": "direct",
+    "expected_items": ["croissant"]
+  },
+  {
+    "id": 10,
+    "query": "I am looking for plain yogurt",
+    "query_type": "direct",
+    "expected_items": ["yogurt"]
+  },
+  {
+    "id": 11,
+    "query": "I want to bake a birthday cake, what do I need?",
+    "query_type": "recipe",
+    "expected_items": ["flour", "eggs", "sugar", "butter", "milk"]
+  },
+  {
+    "id": 12,
+    "query": "I need ingredients to make a salad",
+    "query_type": "recipe",
+    "expected_items": ["lettuce", "tomato", "carrot"]
+  },
+  {
+    "id": 13,
+    "query": "Can you help me find everything I need for a fruit smoothie?",
+    "query_type": "recipe",
+    "expected_items": ["banana", "apple", "orange", "yogurt"]
+  },
+  {
+    "id": 14,
+    "query": "I want to make breakfast, what do you have?",
+    "query_type": "recipe",
+    "expected_items": ["bread", "milk", "yogurt"]
+  },
+  {
+    "id": 15,
+    "query": "What do I need to make a cheese sandwich?",
+    "query_type": "recipe",
+    "expected_items": ["bread", "cheese"]
+  },
+  {
+    "id": 16,
+    "query": "I'm hosting a party and need snacks and drinks",
+    "query_type": "associative",
+    "expected_items": ["chips", "cookies", "soda", "juice"]
+  },
+  {
+    "id": 17,
+    "query": "I want something healthy for my lunch",
+    "query_type": "associative",
+    "expected_items": ["apple", "carrot", "water"]
+  },
+  {
+    "id": 18,
+    "query": "I need something sweet to snack on",
+    "query_type": "associative",
+    "expected_items": ["cookies", "donut", "granola"]
+  },
+  {
+    "id": 19,
+    "query": "I am going on a hike, what should I take?",
+    "query_type": "associative",
+    "expected_items": ["water", "nuts", "granola"]
+  },
+  {
+    "id": 20,
+    "query": "I want to make a hot beverage this morning",
+    "query_type": "associative",
+    "expected_items": ["coffee", "milk"]
+  },
+  {
+    "id": 21,
+    "query": "Do you carry sushi ingredients?",
+    "query_type": "not_in_store",
+    "expected_items": []
+  },
+  {
+    "id": 22,
+    "query": "Where can I find dog food?",
+    "query_type": "not_in_store",
+    "expected_items": []
+  },
+  {
+    "id": 23,
+    "query": "I need some fresh salmon",
+    "query_type": "not_in_store",
+    "expected_items": []
+  },
+  {
+    "id": 24,
+    "query": "Do you sell pasta?",
+    "query_type": "not_in_store",
+    "expected_items": []
+  },
+  {
+    "id": 25,
+    "query": "Can I get some ice cream?",
+    "query_type": "not_in_store",
+    "expected_items": []
+  },
+  {
+    "id": 26,
+    "query": "Hello there, how are you today?",
+    "query_type": "conversational",
+    "expected_items": []
+  },
+  {
+    "id": 27,
+    "query": "What can you help me with?",
+    "query_type": "conversational",
+    "expected_items": []
+  },
+  {
+    "id": 28,
+    "query": "What are your opening hours?",
+    "query_type": "conversational",
+    "expected_items": []
+  },
+  {
+    "id": 29,
+    "query": "Hi! I'm new here. Can you explain how this store works?",
+    "query_type": "conversational",
+    "expected_items": []
+  },
+  {
+    "id": 30,
+    "query": "Thank you for your help!",
+    "query_type": "conversational",
+    "expected_items": []
+  },
+  {
+    "id": 31,
+    "query": "I need milk and bananas",
+    "query_type": "direct",
+    "expected_items": ["milk", "banana"]
+  },
+  {
+    "id": 32,
+    "query": "Can you add apples and oranges to my cart?",
+    "query_type": "direct",
+    "expected_items": ["apple", "orange"]
+  },
+  {
+    "id": 33,
+    "query": "I would like broccoli and carrots",
+    "query_type": "direct",
+    "expected_items": ["broccoli", "carrot"]
+  },
+  {
+    "id": 34,
+    "query": "Please get me wheat bread and coffee",
+    "query_type": "direct",
+    "expected_items": ["bread", "coffee"]
+  },
+  {
+    "id": 35,
+    "query": "Do you have grapes and granola bars?",
+    "query_type": "direct",
+    "expected_items": ["grape", "granola"]
+  },
+  {
+    "id": 36,
+    "query": "I need ingredients to bake chocolate chip cookies",
+    "query_type": "recipe",
+    "expected_items": ["flour", "eggs", "sugar", "butter"]
+  },
+  {
+    "id": 37,
+    "query": "What do I need to make a vegetable stir fry?",
+    "query_type": "recipe",
+    "expected_items": ["broccoli", "carrot", "lettuce"]
+  },
+  {
+    "id": 38,
+    "query": "I want to make pancakes, what ingredients do you have?",
+    "query_type": "recipe",
+    "expected_items": ["flour", "milk", "eggs"]
+  },
+  {
+    "id": 39,
+    "query": "Help me find everything for a fruit salad",
+    "query_type": "recipe",
+    "expected_items": ["apple", "banana", "orange", "grape"]
+  },
+  {
+    "id": 40,
+    "query": "I need to bake banana bread",
+    "query_type": "recipe",
+    "expected_items": ["banana", "flour", "eggs"]
+  },
+  {
+    "id": 41,
+    "query": "Something for my kids' lunchbox",
+    "query_type": "associative",
+    "expected_items": ["apple", "granola", "yogurt", "juice"]
+  },
+  {
+    "id": 42,
+    "query": "I want a healthy breakfast option",
+    "query_type": "associative",
+    "expected_items": ["yogurt", "granola", "apple"]
+  },
+  {
+    "id": 43,
+    "query": "What do you have for a movie night?",
+    "query_type": "associative",
+    "expected_items": ["popcorn", "soda", "chips", "cookies"]
+  },
+  {
+    "id": 44,
+    "query": "I need something for a late night snack",
+    "query_type": "associative",
+    "expected_items": ["chips", "cookies", "nuts"]
+  },
+  {
+    "id": 45,
+    "query": "I'm trying to eat more vegetables this week",
+    "query_type": "associative",
+    "expected_items": ["broccoli", "carrot", "tomato", "lettuce"]
+  },
+  {
+    "id": 46,
+    "query": "Do you stock flour?",
+    "query_type": "not_in_store",
+    "expected_items": []
+  },
+  {
+    "id": 47,
+    "query": "I need to find some eggs",
+    "query_type": "not_in_store",
+    "expected_items": []
+  },
+  {
+    "id": 48,
+    "query": "Where is the butter?",
+    "query_type": "not_in_store",
+    "expected_items": []
+  },
+  {
+    "id": 49,
+    "query": "Can I get 2 litres of milk please?",
+    "query_type": "direct",
+    "expected_items": ["milk"]
+  },
+  {
+    "id": 50,
+    "query": "I need cola and some mixed nuts",
+    "query_type": "direct",
+    "expected_items": ["soda", "nuts"]
+  }
+]
