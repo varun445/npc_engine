@@ -1,8 +1,8 @@
 """
 evaluate.py — Automated Evaluation Framework for the NPC Engine LLM Pipeline
 ==============================================================================
-Runs 50 natural-language queries through the shop-assistant pipeline and
-measures four research metrics:
+Runs natural-language queries through the shop-assistant pipeline and measures
+four research metrics:
 
     1. Task Success Rate  — agent correctly handles each query type
                            (moves to valid aisles when items are found;
@@ -17,13 +17,46 @@ measures four research metrics:
                            containing exactly the keys: "dialogue", "action",
                            and "target_aisles".
 
+Evaluation Modes (--mode)
+--------------------------
+    presearch  (default)
+        Full pipeline: term extraction → inventory search (search_inventory
+        tool hook) → response generation.  This is the grounded, anti-
+        hallucination architecture described in the project thesis.
+
+    llm_only
+        Vanilla LLM baseline: the query is sent directly to the response-
+        generation step with *no* inventory lookup.  This mode measures how
+        often the model hallucinates or fails without grounded context.
+
+    both
+        Runs every query through *both* modes (presearch first, then
+        llm_only) and saves two labelled rows per query.  Use this for the
+        side-by-side experimental comparison described in the thesis.
+
+Checkpointing / Resume Support
+--------------------------------
+Results for completed queries are written immediately to a rolling file
+``<output_dir>/results.csv``.  If the run is interrupted, re-launching with
+the same ``--output`` directory will automatically detect how many rows are
+already present and continue from the next query index.
+
+Use ``--start_from N`` to explicitly override the resume point (0-based query
+index).
+
 Usage
 -----
-    # Run against a live Ollama server (default):
+    # Run against a live Ollama server (default mode: presearch):
     python evaluate.py
 
     # Dry-run with a mock LLM (no Ollama needed — for CI / unit testing):
     python evaluate.py --mock
+
+    # Experimental comparison (LLM with vs. without inventory search):
+    python evaluate.py --mode both
+
+    # Baseline only (vanilla LLM, no search):
+    python evaluate.py --mode llm_only
 
     # Specify a custom dataset path or output directory:
     python evaluate.py --queries evaluation/queries.json --output evaluation/results
@@ -31,11 +64,40 @@ Usage
     # Limit to the first N queries (useful for quick smoke-tests):
     python evaluate.py --limit 10
 
+    # Explicitly resume from a specific query index (0-based):
+    python evaluate.py --start_from 20
+
 Output
 ------
-  evaluation/results/results.csv  — per-query detail rows
-  evaluation/results/summary.txt  — human-readable metric summary
-  Console                         — live progress + final table
+  <output_dir>/results.csv              — rolling per-query detail rows
+                                          (appended on resume; never overwritten)
+  <output_dir>/results_<timestamp>.csv  — snapshot of this run's rows
+  <output_dir>/summary_<timestamp>.txt  — human-readable metric summary
+  Console                               — live progress + final table
+
+Design Notes (for thesis appendix)
+------------------------------------
+The evaluation script implements *incremental, resumable benchmarking*:
+
+  1. After each query (or pair of queries in ``--mode both``) the result row(s)
+     are appended to ``results.csv`` so that a crash or keyboard interrupt only
+     loses the current in-flight query.
+
+  2. On startup, ``_count_existing_results`` reads the row count from the
+     rolling CSV.  For a single-mode run this equals the number of completed
+     queries; for a ``both``-mode run it equals ``completed_queries × 2``, so
+     the resume index is ``row_count // 2``.
+
+  3. The ``--mode both`` comparison is implemented by running each query twice
+     through ``_run_single_query``, once per mode, and saving both rows before
+     moving to the next query.  This keeps the per-query checkpoint atomic:
+     either both rows for a query are saved or neither are (the checkpoint is
+     written after both calls complete).
+
+  4. The ``mode`` column in the CSV makes it straightforward to load the data
+     in a notebook and split rows by mode for metric comparison:
+         df_pre  = df[df['mode'] == 'presearch']
+         df_llm  = df[df['mode'] == 'llm_only']
 """
 
 import argparse
@@ -68,6 +130,10 @@ ASSISTANT_NAME = "Alex"
 
 DEFAULT_QUERIES_PATH = os.path.join(REPO_ROOT, "evaluation", "queries.json")
 DEFAULT_OUTPUT_DIR = os.path.join(REPO_ROOT, "evaluation", "results")
+
+# Rolling results file used for checkpointing / resume support.
+# This filename is fixed (no timestamp) so re-runs can detect existing rows.
+ROLLING_RESULTS_FILENAME = "results.csv"
 
 
 # ---------------------------------------------------------------------------
@@ -199,103 +265,267 @@ def _is_task_success(response: dict, expected_items: list[str], inventory: Inven
 
 
 # ---------------------------------------------------------------------------
+# Checkpointing helpers
+# ---------------------------------------------------------------------------
+
+def _count_existing_results(csv_path: str) -> int:
+    """Return the number of *data* rows already present in *csv_path*.
+
+    Returns 0 if the file does not exist or contains only a header.
+    """
+    if not os.path.isfile(csv_path):
+        return 0
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        return sum(1 for _ in reader)
+
+
+def _append_csv(rows: list[dict], csv_path: str) -> None:
+    """Append *rows* to the rolling CSV at *csv_path*.
+
+    If the file does not yet exist it is created with a header row first.
+    All rows in *rows* must share the same set of keys.
+    """
+    if not rows:
+        return
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+    file_exists = os.path.isfile(csv_path)
+    with open(csv_path, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        if not file_exists:
+            writer.writeheader()
+        writer.writerows(rows)
+
+
+# ---------------------------------------------------------------------------
 # Core evaluation runner
 # ---------------------------------------------------------------------------
+
+def _run_single_query(
+    item: dict,
+    idx: int,
+    total: int,
+    inventory: "Inventory",
+    inventory_summary: str,
+    extract_fn,
+    generate_fn,
+    mode: str,
+    verbose: bool,
+) -> dict:
+    """Execute the pipeline for a single query in the specified *mode*.
+
+    Parameters
+    ----------
+    item:
+        A single query dict from the JSON dataset.
+    idx:
+        1-based position of this query in the current run (for progress display).
+    total:
+        Total number of queries in the current run.
+    inventory:
+        Shared :class:`~models.inventory.Inventory` instance.
+    inventory_summary:
+        Pre-built inventory summary string passed to the response generator.
+    extract_fn:
+        Callable that extracts product terms from a query string.
+    generate_fn:
+        Callable that generates the shop-assistant JSON response.
+    mode:
+        ``"presearch"`` — full pipeline (extraction + search + generation).
+        ``"llm_only"``  — generation only; no inventory lookup performed.
+    verbose:
+        Print per-query progress lines to stdout.
+
+    Returns
+    -------
+    dict
+        A result row ready to be appended to the results CSV.
+    """
+    qid = item["id"]
+    query = item["query"]
+    query_type = item.get("query_type", "unknown")
+    expected_items = item.get("expected_items", [])
+
+    if verbose:
+        print(
+            f"  [{idx:02d}/{total}] Q{qid} ({query_type:14s})"
+            f" [{mode:9s}]: {query[:60]!r}"
+        )
+
+    # ── Pipeline timing start ─────────────────────────────────────────────
+    t_start = time.perf_counter()
+
+    if mode == "presearch":
+        # Step 1 — extract product terms from the query
+        product_terms = extract_fn(query)
+
+        # Step 2 — deterministic inventory search (the "pre-search hook")
+        tool_observations: list[str] = []
+        if product_terms:
+            observation = inventory.search_inventory(product_terms)
+            tool_observations.append(observation)
+    else:
+        # llm_only — skip extraction and search; send the query directly
+        product_terms = []
+        tool_observations = []
+
+    # Step 3 — generate final response (grounded or vanilla depending on mode)
+    raw_response = generate_fn(
+        ASSISTANT_NAME,
+        query,
+        inventory_summary,
+        [],              # empty memory for independent per-query evaluation
+        tool_observations,
+    )
+
+    t_end = time.perf_counter()
+    latency = round(t_end - t_start, 3)
+    # ── Pipeline timing end ───────────────────────────────────────────────
+
+    # ── Metric 1: JSON Adherence ──────────────────────────────────────────
+    json_adherent = isinstance(raw_response, dict) and REQUIRED_JSON_KEYS.issubset(
+        raw_response.keys()
+    )
+
+    # ── Metric 2: Task Success ────────────────────────────────────────────
+    task_success = _is_task_success(raw_response, expected_items, inventory)
+
+    # ── Metric 3: Hallucination ───────────────────────────────────────────
+    hallucinated_aisles = _find_hallucinated_aisles(raw_response)
+    hallucinated = len(hallucinated_aisles) > 0
+
+    # ── Collect result ────────────────────────────────────────────────────
+    result_row = {
+        "id": qid,
+        "mode": mode,
+        "query_type": query_type,
+        "query": query,
+        "expected_items": "; ".join(expected_items),
+        "product_terms_extracted": "; ".join(product_terms),
+        "action": raw_response.get("action", ""),
+        "target_aisles": str(raw_response.get("target_aisles", [])),
+        "dialogue_snippet": raw_response.get("dialogue", "")[:MAX_DIALOGUE_SNIPPET_LENGTH],
+        "json_adherent": json_adherent,
+        "task_success": task_success,
+        "hallucinated": hallucinated,
+        "hallucinated_aisles": str(hallucinated_aisles),
+        "latency_s": latency,
+    }
+
+    if verbose:
+        status_icon = "✓" if task_success else "✗"
+        hall_icon = "H" if hallucinated else " "
+        json_icon = "J" if json_adherent else "!"
+        print(
+            f"         [{status_icon}][{hall_icon}][{json_icon}]"
+            f"  action={result_row['action']:5s}"
+            f"  aisles={result_row['target_aisles']:10s}"
+            f"  latency={latency:.2f}s"
+        )
+
+    return result_row
+
+
+def _build_pipeline_callables(mock: bool):
+    """Return ``(extract_fn, generate_fn)`` for the requested LLM backend."""
+    if mock:
+        return _mock_extract_product_terms, _mock_generate_response
+    from engine.llm_client import extract_product_terms, generate_shop_assistant_response
+    return extract_product_terms, generate_shop_assistant_response
+
 
 def run_evaluation(
     queries: list[dict],
     mock: bool = False,
     verbose: bool = True,
+    mode: str = "presearch",
+    checkpoint_path: str | None = None,
 ) -> list[dict]:
-    """Run all queries through the pipeline and return a list of result dicts."""
+    """Run all queries through the pipeline and return a list of result dicts.
 
+    Parameters
+    ----------
+    queries:
+        List of query dicts loaded from the JSON dataset.
+    mock:
+        When True, use deterministic mock functions instead of calling Ollama.
+    verbose:
+        Print per-query progress to stdout.
+    mode:
+        ``"presearch"`` — full pipeline (term extraction + inventory search +
+        generation).
+        ``"llm_only"``  — generation only (no inventory lookup; vanilla LLM
+        baseline for experimental comparison).
+    checkpoint_path:
+        If provided, each result row is appended to this CSV immediately after
+        it is computed, enabling crash-resume without losing completed work.
+    """
     inventory = Inventory()
     inventory_summary = _build_inventory_summary(inventory)
-
-    if mock:
-        extract_fn = _mock_extract_product_terms
-        generate_fn = _mock_generate_response
-    else:
-        from engine.llm_client import extract_product_terms, generate_shop_assistant_response
-        extract_fn = extract_product_terms
-        generate_fn = generate_shop_assistant_response
+    extract_fn, generate_fn = _build_pipeline_callables(mock)
 
     results: list[dict] = []
+    total = len(queries)
 
     for idx, item in enumerate(queries, start=1):
-        qid = item["id"]
-        query = item["query"]
-        query_type = item.get("query_type", "unknown")
-        expected_items = item.get("expected_items", [])
-
-        if verbose:
-            print(f"  [{idx:02d}/{len(queries)}] Q{qid} ({query_type:14s}): {query[:60]!r}")
-
-        # ── Pipeline timing start ─────────────────────────────────────────
-        t_start = time.perf_counter()
-
-        # Step 1 — extract product terms
-        product_terms = extract_fn(query)
-
-        # Step 2 — deterministic inventory search
-        tool_observations: list[str] = []
-        if product_terms:
-            observation = inventory.search_inventory(product_terms)
-            tool_observations.append(observation)
-
-        # Step 3 — generate final response
-        raw_response = generate_fn(
-            ASSISTANT_NAME,
-            query,
-            inventory_summary,
-            [],          # empty memory for independent evaluation
-            tool_observations,
+        result_row = _run_single_query(
+            item, idx, total, inventory, inventory_summary,
+            extract_fn, generate_fn, mode, verbose,
         )
-
-        t_end = time.perf_counter()
-        latency = round(t_end - t_start, 3)
-        # ── Pipeline timing end ───────────────────────────────────────────
-
-        # ── Metric 1: JSON Adherence ──────────────────────────────────────
-        json_adherent = isinstance(raw_response, dict) and REQUIRED_JSON_KEYS.issubset(
-            raw_response.keys()
-        )
-
-        # ── Metric 2: Task Success ────────────────────────────────────────
-        task_success = _is_task_success(raw_response, expected_items, inventory)
-
-        # ── Metric 3: Hallucination ───────────────────────────────────────
-        hallucinated_aisles = _find_hallucinated_aisles(raw_response)
-        hallucinated = len(hallucinated_aisles) > 0
-
-        # ── Collect result ────────────────────────────────────────────────
-        result_row = {
-            "id": qid,
-            "query_type": query_type,
-            "query": query,
-            "expected_items": "; ".join(expected_items),
-            "product_terms_extracted": "; ".join(product_terms),
-            "action": raw_response.get("action", ""),
-            "target_aisles": str(raw_response.get("target_aisles", [])),
-            "dialogue_snippet": raw_response.get("dialogue", "")[:MAX_DIALOGUE_SNIPPET_LENGTH],
-            "json_adherent": json_adherent,
-            "task_success": task_success,
-            "hallucinated": hallucinated,
-            "hallucinated_aisles": str(hallucinated_aisles),
-            "latency_s": latency,
-        }
         results.append(result_row)
 
+        if checkpoint_path:
+            _append_csv([result_row], checkpoint_path)
+
+    return results
+
+
+def _run_both_modes(
+    queries: list[dict],
+    mock: bool = False,
+    verbose: bool = True,
+    checkpoint_path: str | None = None,
+) -> list[dict]:
+    """Run each query in both ``presearch`` and ``llm_only`` modes.
+
+    For each query the presearch row is recorded first, followed by the
+    llm_only row.  When *checkpoint_path* is provided, both rows for a query
+    are appended to the file **after both calls complete**, so a crash only
+    ever loses the current query's pair (not a partial pair).
+
+    This interleaved layout makes it easy to load the CSV in a notebook and
+    compare modes side-by-side:
+
+        df = pd.read_csv("results.csv")
+        df_pre = df[df["mode"] == "presearch"]
+        df_llm = df[df["mode"] == "llm_only"]
+    """
+    inventory = Inventory()
+    inventory_summary = _build_inventory_summary(inventory)
+    extract_fn, generate_fn = _build_pipeline_callables(mock)
+
+    results: list[dict] = []
+    total = len(queries)
+
+    for idx, item in enumerate(queries, start=1):
         if verbose:
-            status_icon = "✓" if task_success else "✗"
-            hall_icon = "H" if hallucinated else " "
-            json_icon = "J" if json_adherent else "!"
-            print(
-                f"         [{status_icon}][{hall_icon}][{json_icon}]"
-                f"  action={result_row['action']:5s}"
-                f"  aisles={result_row['target_aisles']:10s}"
-                f"  latency={latency:.2f}s"
-            )
+            print(f"\n  ── Query {idx}/{total} (both modes) ──")
+
+        row_pre = _run_single_query(
+            item, idx, total, inventory, inventory_summary,
+            extract_fn, generate_fn, "presearch", verbose,
+        )
+        row_llm = _run_single_query(
+            item, idx, total, inventory, inventory_summary,
+            extract_fn, generate_fn, "llm_only", verbose,
+        )
+
+        results.append(row_pre)
+        results.append(row_llm)
+
+        # Checkpoint both rows atomically so we never write a partial pair
+        if checkpoint_path:
+            _append_csv([row_pre, row_llm], checkpoint_path)
 
     return results
 
@@ -342,6 +572,23 @@ def _compute_summary(results: list[dict]) -> dict:
         if r["hallucinated"]:
             by_type[qt]["hallucinated"] += 1
 
+    # Per-mode breakdown — only populated when multiple modes are present
+    modes_present = {r.get("mode", "presearch") for r in results}
+    by_mode: dict[str, dict] = {}
+    if len(modes_present) > 1:
+        for r in results:
+            m = r.get("mode", "presearch")
+            if m not in by_mode:
+                by_mode[m] = {
+                    "total": 0, "success": 0, "hallucinated": 0, "latencies": [],
+                }
+            by_mode[m]["total"] += 1
+            if r["task_success"]:
+                by_mode[m]["success"] += 1
+            if r["hallucinated"]:
+                by_mode[m]["hallucinated"] += 1
+            by_mode[m]["latencies"].append(r["latency_s"])
+
     return {
         "total_queries": n,
         "task_success_rate": round(successes / n * 100, 1),
@@ -352,6 +599,7 @@ def _compute_summary(results: list[dict]) -> dict:
         "latency_max_s": round(max(latencies), 3),
         "latency_p50_s": round(sorted(latencies)[n // 2], 3),
         "by_query_type": by_type,
+        "by_mode": by_mode,
     }
 
 
@@ -368,6 +616,26 @@ def _print_summary(summary: dict) -> None:
     print(f"  Latency (min/p50/max): {summary['latency_min_s']:.3f}s"
           f" / {summary['latency_p50_s']:.3f}s"
           f" / {summary['latency_max_s']:.3f}s")
+
+    # Per-mode comparison table (only shown in --mode both runs)
+    if summary.get("by_mode"):
+        print()
+        print("  Mode comparison (presearch vs. llm_only):")
+        m_header = f"  {'Mode':<12} {'Queries':>7} {'Success':>9} {'Hallucinated':>14} {'Latency mean':>14}"
+        print(m_header)
+        print("  " + "─" * 58)
+        for mode_name, stats in summary["by_mode"].items():
+            t = stats["total"]
+            success_pct = stats["success"] / t * 100 if t else 0
+            hall_pct = stats["hallucinated"] / t * 100 if t else 0
+            lat_mean = sum(stats["latencies"]) / len(stats["latencies"]) if stats["latencies"] else 0
+            print(
+                f"  {mode_name:<12} {t:>7}"
+                f" {success_pct:>8.1f}%"
+                f" {hall_pct:>13.1f}%"
+                f" {lat_mean:>13.3f}s"
+            )
+
     print()
     print("  By query type:")
     header = f"  {'Type':<16} {'Queries':>7} {'Success':>9} {'Hallucinated':>14}"
@@ -410,6 +678,28 @@ def _save_summary(summary: dict, output_dir: str, timestamp: str) -> str:
         f"Latency min  (s)     : {summary['latency_min_s']:.3f}",
         f"Latency p50  (s)     : {summary['latency_p50_s']:.3f}",
         f"Latency max  (s)     : {summary['latency_max_s']:.3f}",
+    ]
+
+    if summary.get("by_mode"):
+        lines += [
+            "",
+            "Mode comparison (presearch vs. llm_only):",
+            f"  {'Mode':<12} {'Queries':>7} {'Success':>9} {'Hallucinated':>14} {'Latency mean':>14}",
+            "  " + "─" * 58,
+        ]
+        for mode_name, stats in summary["by_mode"].items():
+            t = stats["total"]
+            success_pct = stats["success"] / t * 100 if t else 0
+            hall_pct = stats["hallucinated"] / t * 100 if t else 0
+            lat_mean = sum(stats["latencies"]) / len(stats["latencies"]) if stats["latencies"] else 0
+            lines.append(
+                f"  {mode_name:<12} {t:>7}"
+                f" {success_pct:>8.1f}%"
+                f" {hall_pct:>13.1f}%"
+                f" {lat_mean:>13.3f}s"
+            )
+
+    lines += [
         "",
         "By query type:",
         f"  {'Type':<16} {'Queries':>7} {'Success':>9} {'Hallucinated':>14}",
@@ -434,7 +724,19 @@ def _save_summary(summary: dict, output_dir: str, timestamp: str) -> str:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Evaluate the NPC Engine LLM pipeline on a query dataset."
+        description="Evaluate the NPC Engine LLM pipeline on a query dataset.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Modes\n"
+            "-----\n"
+            "  presearch  Full pipeline: term extraction → inventory search → generation.\n"
+            "  llm_only   Vanilla LLM baseline: no inventory lookup (hallucination test).\n"
+            "  both       Run every query in both modes and save two labelled rows each.\n\n"
+            "Resume support\n"
+            "--------------\n"
+            "  Rows are written to <output>/results.csv after each query.  Re-running\n"
+            "  with the same --output dir automatically resumes from the last saved row."
+        ),
     )
     parser.add_argument(
         "--queries",
@@ -445,6 +747,25 @@ def _parse_args() -> argparse.Namespace:
         "--output",
         default=DEFAULT_OUTPUT_DIR,
         help="Directory to write CSV and summary files (default: evaluation/results)",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["llm_only", "presearch", "both"],
+        default="presearch",
+        help=(
+            "Evaluation mode: 'presearch' (full pipeline, default), "
+            "'llm_only' (no inventory search), or 'both' (compare both per query)"
+        ),
+    )
+    parser.add_argument(
+        "--start_from",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Start evaluation from query index N (0-based).  "
+            "Auto-detected from the existing results.csv when not specified."
+        ),
     )
     parser.add_argument(
         "--mock",
@@ -469,7 +790,7 @@ def _parse_args() -> argparse.Namespace:
 def main() -> int:
     args = _parse_args()
 
-    # Load queries
+    # ── Load query dataset ────────────────────────────────────────────────
     if not os.path.isfile(args.queries):
         print(f"[ERROR] Query file not found: {args.queries}", file=sys.stderr)
         return 1
@@ -479,25 +800,74 @@ def main() -> int:
     if args.limit:
         queries = queries[: args.limit]
 
-    mode_label = "MOCK (no Ollama)" if args.mock else "LIVE (Ollama/Mistral)"
+    # ── Determine starting query index (resume support) ───────────────────
+    resume_csv = os.path.join(args.output, ROLLING_RESULTS_FILENAME)
+
+    if args.start_from is not None:
+        start_idx = args.start_from
+        print(f"[Resume] --start_from override: starting at query index {start_idx}")
+    else:
+        existing_rows = _count_existing_results(resume_csv)
+        if args.mode == "both":
+            # Each query produces 2 rows (presearch + llm_only)
+            start_idx = existing_rows // 2
+        else:
+            start_idx = existing_rows
+        if start_idx > 0:
+            print(f"[Resume] Found {existing_rows} existing row(s) in {resume_csv}")
+            print(f"         Resuming from query index {start_idx} "
+                  f"(skipping {start_idx} already-completed queries)")
+
+    if start_idx >= len(queries):
+        print(
+            f"[INFO] All {len(queries)} queries already completed "
+            f"(found {_count_existing_results(resume_csv)} rows in {resume_csv}). "
+            "Nothing to do."
+        )
+        return 0
+
+    queries_to_run = queries[start_idx:]
+
+    # ── Print run header ──────────────────────────────────────────────────
+    llm_label = "MOCK (no Ollama)" if args.mock else "LIVE (Ollama/Mistral)"
     print(f"\nNPC Engine — LLM Pipeline Evaluation")
-    print(f"Mode    : {mode_label}")
-    print(f"Queries : {len(queries)}")
+    print(f"LLM     : {llm_label}")
+    print(f"Mode    : {args.mode}")
+    print(
+        f"Queries : {len(queries_to_run)}"
+        + (f" (of {len(queries)} total, resuming from index {start_idx})"
+           if start_idx > 0 else f" (of {len(queries)} total)")
+    )
     print(f"Output  : {args.output}")
     print()
 
-    # Run evaluation
-    results = run_evaluation(queries, mock=args.mock, verbose=not args.quiet)
+    # ── Run evaluation ────────────────────────────────────────────────────
+    if args.mode == "both":
+        results = _run_both_modes(
+            queries_to_run,
+            mock=args.mock,
+            verbose=not args.quiet,
+            checkpoint_path=resume_csv,
+        )
+    else:
+        results = run_evaluation(
+            queries_to_run,
+            mock=args.mock,
+            verbose=not args.quiet,
+            mode=args.mode,
+            checkpoint_path=resume_csv,
+        )
 
-    # Compute and display summary
+    # ── Compute and display summary ───────────────────────────────────────
     summary = _compute_summary(results)
     _print_summary(summary)
 
-    # Persist results
+    # ── Persist timestamped snapshot of this run ──────────────────────────
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     csv_path = _save_csv(results, args.output, timestamp)
     summary_path = _save_summary(summary, args.output, timestamp)
     print(f"\n  Results CSV  → {csv_path}")
+    print(f"  Rolling CSV  → {resume_csv}")
     print(f"  Summary file → {summary_path}\n")
 
     return 0
