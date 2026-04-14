@@ -18,7 +18,14 @@ def _log(msg):
 
 
 def _parse_json_flexible(text):
-    """Parse JSON even when wrapped in markdown fences or extra prose."""
+    """Parse JSON from LLM text.
+
+    Args:
+        text: Raw model response text.
+
+    Returns:
+        Parsed JSON value (dict/list/scalar) when decodable, else ``None``.
+    """
     if not isinstance(text, str):
         return None
 
@@ -119,7 +126,7 @@ Customer query: "{customer_query}"
     try:
         data = _parse_json_flexible(response)
         if not isinstance(data, dict):
-            raise TypeError(f"Expected JSON object but got {type(data).__name__}")
+            raise TypeError(f"Expected dict but got {type(data).__name__}")
         terms = data.get("terms", [])
         if isinstance(terms, list):
             terms = [str(t).strip() for t in terms if t]
@@ -289,7 +296,7 @@ Reply with ONLY valid JSON in this exact format and nothing else:
     try:
         result = _parse_json_flexible(response)
         if not isinstance(result, dict):
-            raise TypeError(f"Expected JSON object but got {type(result).__name__}")
+            raise TypeError(f"Expected dict but got {type(result).__name__}")
 
         # Final response – normalise fields
         if "dialogue" not in result:
@@ -401,7 +408,7 @@ Reply with ONLY valid JSON in this exact format and nothing else:
     try:
         result = _parse_json_flexible(response)
         if not isinstance(result, dict):
-            raise TypeError(f"Expected JSON object but got {type(result).__name__}")
+            raise TypeError(f"Expected dict but got {type(result).__name__}")
         if "dialogue" not in result:
             result["dialogue"] = response
         if "action" not in result:
