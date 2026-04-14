@@ -25,9 +25,9 @@ Evaluation Modes (--mode)
         hallucination architecture described in the project thesis.
 
     llm_only
-        Vanilla LLM baseline: the query is sent directly to the response-
-        generation step with *no* inventory lookup.  This mode measures how
-        often the model hallucinates or fails without grounded context.
+        The query is sent directly to the response-generation step with no
+        deterministic inventory pre-search, but with full inventory context in
+        the prompt.
 
     both
         Runs every query through *both* modes (presearch first, then
@@ -163,6 +163,7 @@ def _mock_generate_response(
     inventory_info: str,
     memory: list,
     tool_observations: list | None,
+    include_inventory_in_no_search: bool = False,
 ) -> dict:
     """Return a minimal valid JSON response without calling the LLM."""
     if not tool_observations:
@@ -332,7 +333,8 @@ def _run_single_query(
         Callable that generates the shop-assistant JSON response.
     mode:
         ``"presearch"`` — full pipeline (extraction + search + generation).
-        ``"llm_only"``  — generation only; no inventory lookup performed.
+        ``"llm_only"``  — generation without deterministic lookup; includes
+        full inventory context in the prompt.
     verbose:
         Print per-query progress lines to stdout.
 
@@ -365,7 +367,7 @@ def _run_single_query(
             observation = inventory.search_inventory(product_terms)
             tool_observations.append(observation)
     else:
-        # llm_only — skip extraction and search; send the query directly
+        # llm_only — skip extraction and pre-search; send the query directly
         product_terms = []
         tool_observations = []
 
@@ -376,6 +378,7 @@ def _run_single_query(
         inventory_summary,
         [],              # empty memory for independent per-query evaluation
         tool_observations,
+        include_inventory_in_no_search=(mode == "llm_only"),
     )
 
     t_end = time.perf_counter()
@@ -454,8 +457,8 @@ def run_evaluation(
     mode:
         ``"presearch"`` — full pipeline (term extraction + inventory search +
         generation).
-        ``"llm_only"``  — generation only (no inventory lookup; vanilla LLM
-        baseline for experimental comparison).
+        ``"llm_only"``  — generation without inventory pre-search, but with
+        full inventory context in the prompt.
     checkpoint_path:
         If provided, each result row is appended to this CSV immediately after
         it is computed, enabling crash-resume without losing completed work.
@@ -731,7 +734,7 @@ def _parse_args() -> argparse.Namespace:
             "Modes\n"
             "-----\n"
             "  presearch  Full pipeline: term extraction → inventory search → generation.\n"
-            "  llm_only   Vanilla LLM baseline: no inventory lookup (hallucination test).\n"
+            "  llm_only   No inventory pre-search; prompt includes full inventory context.\n"
             "  both       Run every query in both modes and save two labelled rows each.\n\n"
             "Resume support\n"
             "--------------\n"
@@ -755,7 +758,8 @@ def _parse_args() -> argparse.Namespace:
         default="presearch",
         help=(
             "Evaluation mode: 'presearch' (full pipeline, default), "
-            "'llm_only' (no inventory search), or 'both' (compare both per query)"
+            "'llm_only' (no pre-search, but includes inventory context), or "
+            "'both' (compare both per query)"
         ),
     )
     parser.add_argument(

@@ -131,7 +131,12 @@ def _format_search_observations(tool_observations):
 
 
 def generate_shop_assistant_response(
-    assistant_name, customer_query, inventory_info, memory, tool_observations=None
+    assistant_name,
+    customer_query,
+    inventory_info,
+    memory,
+    tool_observations=None,
+    include_inventory_in_no_search=False,
 ):
     """Generate a final Format B response from the shop assistant.
 
@@ -148,6 +153,10 @@ def generate_shop_assistant_response(
     identified by the pre-processing step), a lightweight conversational prompt
     is used instead so the assistant can respond naturally without being
     constrained by non-existent search results.
+
+    If *include_inventory_in_no_search* is ``True``, the no-search prompt also
+    includes the full inventory summary so evaluation can compare grounded
+    responses even without deterministic pre-search results.
 
     Returns a dict with keys: ``dialogue``, ``action``, ``target_aisles``.
     """
@@ -170,16 +179,22 @@ def generate_shop_assistant_response(
     # Use a simple prompt that lets the assistant respond naturally.       #
     # ------------------------------------------------------------------ #
     if not tool_observations:
+        inventory_context = (
+            f"\nAvailable store inventory reference:\n{inventory_info}\n"
+            if include_inventory_in_no_search and inventory_info
+            else ""
+        )
         prompt = f"""{preamble}
 
-{memory_text}Customer just said: "{customer_query}"
+{memory_text}{inventory_context}Customer just said: "{customer_query}"
 
 Instructions:
 - Respond naturally and helpfully as a shop assistant.
 - You help customers find products, answer general questions about the store, and direct them to the right aisles when asked.
 - If the customer asks what you can do or how you can help, explain that you can help them find products and add items to their cart.
+- If the inventory reference above is provided, use it as the source of truth for product availability and aisle numbers.
 - Keep your response to 1-3 sentences.
-- Do NOT invent specific products or aisle numbers — the customer should ask for a specific product if they want you to find it.
+- Do NOT invent specific products or aisle numbers not present in the inventory reference.
 
 Reply with ONLY valid JSON in this exact format and nothing else:
 {{
@@ -359,4 +374,3 @@ Reply with ONLY valid JSON in this exact format and nothing else:
     except json.JSONDecodeError:
         _log(f"  cashier result  → JSON parse failed; raw={response[:80]}")
         return {"dialogue": response, "action": "none"}
-
