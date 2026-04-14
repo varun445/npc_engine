@@ -1,0 +1,11 @@
+id,query_type,query,expected_items,product_terms_extracted,action,target_aisles,dialogue_snippet,json_adherent,task_success,hallucinated,hallucinated_aisles,latency_s
+1,direct,Where can I find milk?,milk,milk,move,[1],I'm adding Milk (1L) and Milk (2L) to your cart — you'll find them in Aisle 1!,True,True,False,[],371.723
+2,direct,Do you have cheddar cheese?,cheese,cheddar cheese,move,[1],I'm adding Cheddar Cheese (8 in stock) to your cart — you'll find it in Aisle 1!,True,True,False,[],143.276
+3,direct,I need some apples please,apple,apples,none,[],"I'm sorry for the inconvenience, but we don't carry apples here.",True,False,False,[],131.491
+4,direct,Can I get a loaf of white bread?,bread,loaf; white bread,move,[2],"I'm adding White Bread (Aisle 2) to your cart — you'll find it in Aisle 2! Unfortunately, we do not carry loaf.",True,True,False,[],150.311
+5,direct,I would like some orange juice,juice,orange juice,move,[4],I'm adding Orange Juice (Aisle 4) to your cart.,True,True,False,[],136.466
+6,direct,Where are the potato chips?,chips,potato chips,move,[5],I'm adding Potato Chips to your cart - you'll find them in Aisle 5!,True,True,False,[],138.991
+7,direct,Can you help me find bottled water?,water,bottled water,move,[4],I'm adding Bottled Water (Aisle 4) to your cart.,True,True,False,[],136.222
+8,direct,I need a banana,banana,banana,move,[3],I'm adding Banana to your cart — you'll find it in Aisle 3!,True,True,False,[],137.352
+9,direct,Do you sell croissants?,croissant,croissant,move,[2],I'm adding croissants to your cart — you'll find them in Aisle 2!,True,True,False,[],138.741
+10,direct,I am looking for plain yogurt,yogurt,plain yogurt,move,[1],I'm adding Plain Yogurt to your cart — you'll find it in Aisle 1!,True,True,False,[],139.973

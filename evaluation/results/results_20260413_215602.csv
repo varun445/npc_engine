@@ -1,0 +1,11 @@
+id,query_type,query,expected_items,product_terms_extracted,action,target_aisles,dialogue_snippet,json_adherent,task_success,hallucinated,hallucinated_aisles,latency_s
+1,direct,Where can I find milk?,milk,,none,[],How can I help you?,True,False,False,[],0.0
+2,direct,Do you have cheddar cheese?,cheese,cheddar cheese; cheese,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.001
+3,direct,I need some apples please,apple,apple,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+4,direct,Can I get a loaf of white bread?,bread,white bread,move,[2],I found those items. They are in Aisle(s) 2.,True,True,False,[],0.0
+5,direct,I would like some orange juice,juice,orange juice; orange,move,"[3, 4]","I found those items. They are in Aisle(s) 3, 4.",True,True,False,[],0.0
+6,direct,Where are the potato chips?,chips,potato chips; chips,move,[5],I found those items. They are in Aisle(s) 5.,True,True,False,[],0.0
+7,direct,Can you help me find bottled water?,water,bottled water; water,move,[4],I found those items. They are in Aisle(s) 4.,True,True,False,[],0.0
+8,direct,I need a banana,banana,banana,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+9,direct,Do you sell croissants?,croissant,croissant,move,[2],I found those items. They are in Aisle(s) 2.,True,True,False,[],0.0
+10,direct,I am looking for plain yogurt,yogurt,plain yogurt; yogurt,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0

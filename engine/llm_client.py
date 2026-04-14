@@ -7,7 +7,7 @@ from models.inventory import SEARCH_RESULTS_PREFIX
 # response returned by it, plus per-step summaries (terms, action, aisles,
 # dialogue snippet).  The full Ollama API metadata (eval counts, timings,
 # etc.) is never printed — only the text "response" field is shown.
-DEBUG = False
+DEBUG = True
 
 
 def _log(msg):
