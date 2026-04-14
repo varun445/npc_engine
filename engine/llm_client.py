@@ -119,17 +119,13 @@ Customer query: "{customer_query}"
     try:
         data = _parse_json_flexible(response)
         if not isinstance(data, dict):
-            raise json.JSONDecodeError(
-                f"Expected JSON object but got {type(data).__name__}",
-                response,
-                0,
-            )
+            raise TypeError(f"Expected JSON object but got {type(data).__name__}")
         terms = data.get("terms", [])
         if isinstance(terms, list):
             terms = [str(t).strip() for t in terms if t]
         else:
             terms = []
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, TypeError):
         terms = []
     _log(f"  terms extracted  → {terms}")
     return terms
@@ -293,11 +289,7 @@ Reply with ONLY valid JSON in this exact format and nothing else:
     try:
         result = _parse_json_flexible(response)
         if not isinstance(result, dict):
-            raise json.JSONDecodeError(
-                f"Expected JSON object but got {type(result).__name__}",
-                response,
-                0,
-            )
+            raise TypeError(f"Expected JSON object but got {type(result).__name__}")
 
         # Final response – normalise fields
         if "dialogue" not in result:
@@ -322,7 +314,7 @@ Reply with ONLY valid JSON in this exact format and nothing else:
             result["action"] = "move"
         _log(f"  assistant result → action={result['action']} | aisles={result['target_aisles']} | \"{result.get('dialogue', '')[:80]}\"")
         return result
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, TypeError):
         _log(f"  assistant result → JSON parse failed; raw={response[:80]}")
         return {"dialogue": response, "action": "none", "target_aisles": []}
 
@@ -409,11 +401,7 @@ Reply with ONLY valid JSON in this exact format and nothing else:
     try:
         result = _parse_json_flexible(response)
         if not isinstance(result, dict):
-            raise json.JSONDecodeError(
-                f"Expected JSON object but got {type(result).__name__}",
-                response,
-                0,
-            )
+            raise TypeError(f"Expected JSON object but got {type(result).__name__}")
         if "dialogue" not in result:
             result["dialogue"] = response
         if "action" not in result:
@@ -423,6 +411,6 @@ Reply with ONLY valid JSON in this exact format and nothing else:
             result["action"] = "none"
         _log(f"  cashier result  → action={result['action']} | \"{result.get('dialogue', '')[:80]}\"")
         return result
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, TypeError):
         _log(f"  cashier result  → JSON parse failed; raw={response[:80]}")
         return {"dialogue": response, "action": "none"}
