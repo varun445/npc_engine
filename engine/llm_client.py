@@ -1,5 +1,6 @@
 import requests
 import json
+import re
 from models.inventory import SEARCH_RESULTS_PREFIX
 
 # Set to True to print a structured workflow trace to the terminal.
@@ -14,6 +15,39 @@ def _log(msg):
     """Print a debug line to stdout only when DEBUG is enabled."""
     if DEBUG:
         print(f"[DEBUG] {msg}")
+
+
+def _parse_json_flexible(text):
+    """Parse JSON even when wrapped in markdown fences or extra prose."""
+    if not isinstance(text, str):
+        return None
+
+    # 1) Fast path: strict JSON payload.
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # 2) Common LLM format: ```json ... ```
+    fenced_blocks = re.findall(r"```(?:json)?\s*([\s\S]*?)\s*```", text, flags=re.IGNORECASE)
+    for block in fenced_blocks:
+        try:
+            return json.loads(block.strip())
+        except json.JSONDecodeError:
+            continue
+
+    # 3) Fallback: locate first decodable JSON object/array inside mixed text.
+    decoder = json.JSONDecoder()
+    for i, ch in enumerate(text):
+        if ch not in "{[":
+            continue
+        try:
+            parsed, _ = decoder.raw_decode(text[i:])
+            return parsed
+        except json.JSONDecodeError:
+            continue
+
+    return None
 
 
 def query_llm(prompt):
@@ -83,7 +117,9 @@ Customer query: "{customer_query}"
 """
     response = query_llm(prompt)
     try:
-        data = json.loads(response)
+        data = _parse_json_flexible(response)
+        if not isinstance(data, dict):
+            raise json.JSONDecodeError("Parsed payload is not a JSON object", response, 0)
         terms = data.get("terms", [])
         if isinstance(terms, list):
             terms = [str(t).strip() for t in terms if t]
@@ -251,7 +287,9 @@ Reply with ONLY valid JSON in this exact format and nothing else:
 
     response = query_llm(prompt)
     try:
-        result = json.loads(response)
+        result = _parse_json_flexible(response)
+        if not isinstance(result, dict):
+            raise json.JSONDecodeError("Parsed payload is not a JSON object", response, 0)
 
         # Final response – normalise fields
         if "dialogue" not in result:
@@ -361,7 +399,9 @@ Reply with ONLY valid JSON in this exact format and nothing else:
 
     response = query_llm(prompt)
     try:
-        result = json.loads(response)
+        result = _parse_json_flexible(response)
+        if not isinstance(result, dict):
+            raise json.JSONDecodeError("Parsed payload is not a JSON object", response, 0)
         if "dialogue" not in result:
             result["dialogue"] = response
         if "action" not in result:
