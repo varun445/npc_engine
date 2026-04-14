@@ -119,7 +119,11 @@ Customer query: "{customer_query}"
     try:
         data = _parse_json_flexible(response)
         if not isinstance(data, dict):
-            raise json.JSONDecodeError("Parsed payload is not a JSON object", response, 0)
+            raise json.JSONDecodeError(
+                f"Expected JSON object but got {type(data).__name__}",
+                response,
+                0,
+            )
         terms = data.get("terms", [])
         if isinstance(terms, list):
             terms = [str(t).strip() for t in terms if t]
@@ -289,7 +293,11 @@ Reply with ONLY valid JSON in this exact format and nothing else:
     try:
         result = _parse_json_flexible(response)
         if not isinstance(result, dict):
-            raise json.JSONDecodeError("Parsed payload is not a JSON object", response, 0)
+            raise json.JSONDecodeError(
+                f"Expected JSON object but got {type(result).__name__}",
+                response,
+                0,
+            )
 
         # Final response – normalise fields
         if "dialogue" not in result:
@@ -401,7 +409,11 @@ Reply with ONLY valid JSON in this exact format and nothing else:
     try:
         result = _parse_json_flexible(response)
         if not isinstance(result, dict):
-            raise json.JSONDecodeError("Parsed payload is not a JSON object", response, 0)
+            raise json.JSONDecodeError(
+                f"Expected JSON object but got {type(result).__name__}",
+                response,
+                0,
+            )
         if "dialogue" not in result:
             result["dialogue"] = response
         if "action" not in result:
