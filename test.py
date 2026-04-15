@@ -31,10 +31,15 @@ def main() -> int:
     print(f"[1/3] Checking embedding model '{args.model}'...")
     probe = inventory.probe_embedding_model(model=args.model)
     if not probe:
+        err = inventory.get_last_embedding_error()
+        primary_ep, fallback_ep = inventory.get_embedding_endpoints()
         print(
             "❌ Embedding model check failed. Ensure Ollama is running and model is available "
             f"(e.g., `ollama pull {args.model}`)."
         )
+        print(f"   Tried endpoints: {primary_ep} and {fallback_ep}")
+        if err:
+            print(f"   Last embedding error: {err}")
         return 1
     print(f"✅ Embedding model is working (vector dim: {len(probe)})")
 

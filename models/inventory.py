@@ -3,6 +3,7 @@
 import math
 import os
 import re
+from urllib.parse import urlparse
 
 import requests
 
@@ -79,6 +80,8 @@ class Inventory:
             "OLLAMA_EMBEDDING_FALLBACK_URL",
             os.getenv("OLLAMA_EMBED_URL", "http://localhost:11434/api/embed"),
         )
+        self._embedding_timeout_s = float(os.getenv("OLLAMA_EMBEDDING_TIMEOUT", "30"))
+        self._last_embedding_error = ""
         self._semantic_vector_db = {}
 
     def find_product(self, product_name):
@@ -192,23 +195,65 @@ class Inventory:
         return deduped
 
     def _ollama_embed(self, text, model):
-        payload = {"model": model, "prompt": text}
-        for endpoint in (self._embedding_endpoint, self._embedding_endpoint_fallback):
-            try:
-                response = requests.post(endpoint, json=payload, timeout=10)
-                response.raise_for_status()
-                data = response.json()
+        self._last_embedding_error = ""
 
-                embedding = data.get("embedding")
-                if isinstance(embedding, list) and embedding:
-                    return embedding
+        def _candidate_payloads(endpoint_url):
+            path = (urlparse(endpoint_url).path or "").lower()
+            if path.endswith("/embed"):
+                return [
+                    {"model": model, "input": text},
+                    {"model": model, "prompt": text},
+                ]
+            return [
+                {"model": model, "prompt": text},
+                {"model": model, "input": text},
+            ]
 
-                embeddings = data.get("embeddings")
-                if isinstance(embeddings, list) and embeddings and isinstance(embeddings[0], list):
+        def _extract_embedding(data):
+            embedding = data.get("embedding")
+            if isinstance(embedding, list) and embedding and isinstance(embedding[0], (int, float)):
+                return embedding
+
+            embeddings = data.get("embeddings")
+            if isinstance(embeddings, list) and embeddings:
+                if isinstance(embeddings[0], list):
                     return embeddings[0]
-            except (requests.RequestException, ValueError, TypeError):
+                if isinstance(embeddings[0], (int, float)):
+                    return embeddings
+
+            rows = data.get("data")
+            if isinstance(rows, list) and rows and isinstance(rows[0], dict):
+                emb = rows[0].get("embedding")
+                if isinstance(emb, list) and emb:
+                    return emb
+            return None
+
+        for endpoint in (self._embedding_endpoint, self._embedding_endpoint_fallback):
+            if not endpoint:
                 continue
+            for payload in _candidate_payloads(endpoint):
+                try:
+                    response = requests.post(endpoint, json=payload, timeout=self._embedding_timeout_s)
+                    response.raise_for_status()
+                    data = response.json()
+                    embedding = _extract_embedding(data)
+                    if embedding:
+                        return embedding
+                    self._last_embedding_error = (
+                        f"Unexpected response format from {endpoint}: keys={list(data.keys())}"
+                    )
+                except (requests.RequestException, ValueError, TypeError) as exc:
+                    self._last_embedding_error = f"{endpoint} ({type(exc).__name__}): {exc}"
+                    continue
         return None
+
+    def get_last_embedding_error(self):
+        """Return last embedding-request error detail, if any."""
+        return self._last_embedding_error
+
+    def get_embedding_endpoints(self):
+        """Return configured primary/fallback embedding endpoints."""
+        return (self._embedding_endpoint, self._embedding_endpoint_fallback)
 
     def probe_embedding_model(self, model="nomic-embed-text", text="embedding probe"):
         """Return one embedding vector for a probe text, or None if unavailable."""
