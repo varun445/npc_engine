@@ -407,11 +407,15 @@ class Inventory:
             return SEARCH_RESULTS_PREFIX + f"{label}: not found in store inventory"
 
         formatted_matches = [
-            self._format_match(item["product"], item["aisle"])
+            (
+                f"{item['product']['name']} | aisle={item['aisle']} | id={item['product']['id']} | "
+                f"score={item['score']:.4f} | price=${item['product']['price']:.2f} | "
+                f"stock={item['product']['stock']}"
+            )
             for item in matches
         ]
         label = ", ".join(query_terms) if query_terms else query
-        return SEARCH_RESULTS_PREFIX + f"{label}: {', '.join(formatted_matches)}"
+        return SEARCH_RESULTS_PREFIX + f"{label}: {' || '.join(formatted_matches)}"
 
     def search_inventory(self, search_terms):
         """Search inventory for a list of search terms.

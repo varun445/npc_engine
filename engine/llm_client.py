@@ -138,8 +138,8 @@ Customer query: "{customer_query}"
     return terms
 
 
-def _format_search_observations(tool_observations):
-    """Parse tool observation strings into clearly separated FOUND / NOT FOUND sections.
+def _format_search_observations(tool_observations, customer_query=""):
+    """Parse tool observations into grounded FOUND / NOT FOUND lists plus aisle IDs.
 
     Each observation string produced by ``inventory.search_inventory`` has the
     form::
@@ -149,12 +149,24 @@ def _format_search_observations(tool_observations):
     This function splits that blob into two explicit lists so the main LLM
     prompt can emphasise the found items and not overlook them.
 
-    Returns a tuple ``(found_lines, not_found_names)`` where:
+    Returns a tuple ``(found_lines, not_found_names, grounded_aisles)`` where:
         found_lines  — list of strings like "milk: Milk (1L) (Aisle 1, $2.50)"
         not_found_names — list of term strings that were not in stock
+        grounded_aisles — unique aisle numbers extracted from FOUND lines
     """
     found_lines = []
     not_found_names = []
+    grounded_aisles = []
+    stopwords = {
+        "i", "me", "my", "we", "our", "you", "your", "the", "a", "an", "and", "or",
+        "to", "for", "of", "in", "on", "with", "some", "any", "something", "want",
+        "need", "find", "get", "give", "show", "where", "is", "are", "can", "please",
+    }
+    query_tokens = {
+        tok
+        for tok in re.findall(r"[a-z0-9]+", (customer_query or "").lower())
+        if len(tok) > 2 and tok not in stopwords
+    }
 
     for obs in tool_observations:
         # Strip the "Search Results: " prefix if present
@@ -168,9 +180,52 @@ def _format_search_observations(tool_observations):
             if "not found in store inventory" in value:
                 not_found_names.append(term)
             else:
-                found_lines.append(f"{term}: {value}")
+                # Semantic format: "name | aisle=N | id=... | score=... || ..."
+                if "| aisle=" in value:
+                    candidates = []
+                    for chunk in value.split("||"):
+                        line = chunk.strip()
+                        m = re.match(
+                            r"^(?P<name>.*?)\s*\|\s*aisle=(?P<aisle>\d+)\s*\|\s*id=(?P<id>[^|]+)\s*\|\s*score=(?P<score>[0-9.]+)",
+                            line,
+                        )
+                        if not m:
+                            continue
+                        name = m.group("name").strip()
+                        pid = m.group("id").strip().lower()
+                        aisle = int(m.group("aisle"))
+                        score = float(m.group("score"))
+                        name_tokens = set(re.findall(r"[a-z0-9]+", name.lower()))
+                        overlap = len((name_tokens | set(re.findall(r"[a-z0-9]+", pid))) & query_tokens)
+                        candidates.append(
+                            {"name": name, "aisle": aisle, "score": score, "overlap": overlap}
+                        )
 
-    return found_lines, not_found_names
+                    if not candidates:
+                        continue
+
+                    selected = [
+                        c for c in candidates if (c["overlap"] > 0 and c["score"] >= 0.22) or c["score"] >= 0.55
+                    ]
+                    if not selected:
+                        best = max(candidates, key=lambda c: c["score"])
+                        if best["score"] >= 0.80:
+                            selected = [best]
+
+                    selected.sort(key=lambda c: (c["overlap"], c["score"]), reverse=True)
+                    for c in selected:
+                        found_lines.append(f"{term}: {c['name']} (Aisle {c['aisle']})")
+                        if c["aisle"] not in grounded_aisles:
+                            grounded_aisles.append(c["aisle"])
+                else:
+                    found_lines.append(f"{term}: {value}")
+                    aisle_hits = re.findall(r"Aisle\s+(\d+)", value, flags=re.IGNORECASE)
+                    for aisle in aisle_hits:
+                        aisle_num = int(aisle)
+                        if aisle_num not in grounded_aisles:
+                            grounded_aisles.append(aisle_num)
+
+    return found_lines, not_found_names, grounded_aisles
 
 
 def generate_shop_assistant_response(
@@ -252,11 +307,13 @@ Reply with ONLY valid JSON in this exact format and nothing else:
         # ------------------------------------------------------------------ #
         # Product-search path — build FOUND / NOT FOUND sections.            #
         # ------------------------------------------------------------------ #
-        found_lines, not_found_names = _format_search_observations(tool_observations)
+        found_lines, not_found_names, grounded_aisles = _format_search_observations(
+            tool_observations, customer_query=customer_query
+        )
 
         search_section = ""
         if found_lines:
-            search_section += "\n*** ITEMS WE CARRY (you MUST tell the customer about each one with its aisle number) ***\n"
+            search_section += "\n*** ITEMS WE CARRY (respond ONLY with items that appear here, with exact aisle numbers) ***\n"
             for line in found_lines:
                 search_section += f"  FOUND: {line}\n"
 
@@ -272,16 +329,15 @@ Customer just asked: "{customer_query}"
 
 Instructions:
 - Your answer MUST be based ONLY on the search results listed above.
-- For every item in the FOUND section: tell the customer you are adding it to their cart
-  and state its exact aisle number (e.g. "I'm adding Milk (1L) to your cart — you'll find
-  it in Aisle 1!").
+- Mention ONLY the products that are explicitly listed in the FOUND section.
+- For each mentioned FOUND item: state its exact aisle number from the FOUND section.
 - For every item in the NOT FOUND section: tell the customer we do not carry it.
-- If found items are in different aisles, list ALL those aisle numbers in target_aisles.
+- If found items are in different aisles, list only those FOUND-item aisle numbers in target_aisles.
 - Keep your response to 1-2 sentences.
 
 ACTION RULES (follow exactly):
 - If the FOUND section above contains any items → set action to "move" and list every
-  found item's aisle number in target_aisles.
+   found item's aisle number in target_aisles.
 - If the FOUND section is empty (all items not found, or no search was done) → set
   action to "none" and target_aisles to [].
 - NEVER set action to "none" when there are found items with aisle numbers.
@@ -314,6 +370,24 @@ Reply with ONLY valid JSON in this exact format and nothing else:
             try:
                 result["target_aisles"] = [int(result["target_aisles"])]
             except (TypeError, ValueError):
+                result["target_aisles"] = []
+        # Ground aisles to inventory-backed FOUND lines only.
+        if tool_observations:
+            _, _, grounded_aisles = _format_search_observations(
+                tool_observations, customer_query=customer_query
+            )
+            if grounded_aisles:
+                allowed = set(int(x) for x in grounded_aisles)
+                filtered_aisles = []
+                for aisle in result["target_aisles"]:
+                    try:
+                        aisle_int = int(aisle)
+                    except (TypeError, ValueError):
+                        continue
+                    if aisle_int in allowed:
+                        filtered_aisles.append(aisle_int)
+                result["target_aisles"] = filtered_aisles
+            else:
                 result["target_aisles"] = []
         # Safeguard: if aisles are populated the action must be "move".
         # A model may correctly identify aisles but forget to set the action.
