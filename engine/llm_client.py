@@ -9,6 +9,7 @@ from models.inventory import SEARCH_RESULTS_PREFIX, Inventory
 # dialogue snippet).  The full Ollama API metadata (eval counts, timings,
 # etc.) is never printed — only the text "response" field is shown.
 DEBUG = True
+# Keep lower threshold when lexical overlap exists; use stricter gates without overlap.
 MIN_SCORE_WITH_QUERY_OVERLAP = 0.22
 MIN_SCORE_NO_OVERLAP = 0.55
 HIGH_CONFIDENCE_FALLBACK_SCORE = 0.80
@@ -195,7 +196,8 @@ def _format_search_observations(tool_observations, customer_query=""):
                         aisle = int(m.group("aisle"))
                         score = float(m.group("score"))
                         name_tokens = set(re.findall(r"[a-z0-9]+", name.lower()))
-                        overlap = len((name_tokens | set(re.findall(r"[a-z0-9]+", pid))) & query_tokens)
+                        id_tokens = set(re.findall(r"[a-z0-9]+", pid))
+                        overlap = len((name_tokens | id_tokens) & query_tokens)
                         candidates.append(
                             {"name": name, "aisle": aisle, "score": score, "overlap": overlap}
                         )
