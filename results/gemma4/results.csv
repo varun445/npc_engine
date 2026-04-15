@@ -1,0 +1,387 @@
+id,mode,query_type,query,expected_items,product_terms_extracted,action,target_aisles,dialogue_snippet,json_adherent,task_success,hallucinated,hallucinated_aisles,latency_s
+1,presearch,direct,Where can I find milk?,milk,milk,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Milk (1L) and Milk (2L) to your cart — you'll find both of them in Aisle 1!"",
+  ""act",True,False,False,[],2.717
+1,llm_only,direct,Where can I find milk?,milk,,none,[],"```json
+{
+  ""dialogue"": ""You can find our milk over in Aisle 1! We have both 1L and 2L options available."",
+  ""action"": ",True,False,False,[],2.137
+2,presearch,direct,Do you have cheddar cheese?,cheese,cheddar cheese,none,[],"```json
+{
+  ""dialogue"": ""Yes, I'm adding Cheddar Cheese to your cart — you'll find it in Aisle 1!"",
+  ""action"": ""move"",
+",True,False,False,[],3.032
+2,llm_only,direct,Do you have cheddar cheese?,cheese,,none,[],"```json
+{
+  ""dialogue"": ""Yes, we do! You can find the Cheddar Cheese in Aisle 1 with the other dairy products."",
+  ""acti",True,False,False,[],2.05
+3,presearch,direct,I need some apples please,apple,apple,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Apple to your cart from Aisle 3 and Apple Juice from Aisle 4!"",
+  ""action"": ""move"",
+",True,False,False,[],2.478
+3,llm_only,direct,I need some apples please,apple,,none,[],"```json
+{
+  ""dialogue"": ""Of course! You can find the apples in Aisle 3."",
+  ""action"": ""none"",
+  ""target_aisles"": [3]
+}
+`",True,False,False,[],2.456
+4,presearch,direct,Can I get a loaf of white bread?,bread,bread,none,[],"```json
+{
+  ""dialogue"": ""I'm adding White Bread to your cart — you'll find it in Aisle 2! I'm also adding Wheat Bread to",True,False,False,[],3.2
+4,llm_only,direct,Can I get a loaf of white bread?,bread,,none,[],"```json
+{
+  ""dialogue"": ""Of course! You can find the white bread over in Aisle 2 in the bakery section."",
+  ""action"": ""n",True,False,False,[],1.682
+5,presearch,direct,I would like some orange juice,juice,orange juice,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Orange Juice to your cart — you'll find it in Aisle 4!"",
+  ""action"": ""move"",
+  ""targ",True,False,False,[],2.505
+5,llm_only,direct,I would like some orange juice,juice,,none,[],"```json
+{
+  ""dialogue"": ""Of course! You can find our orange juice over in Aisle 4."",
+  ""action"": ""none"",
+  ""target_aisle",True,False,False,[],1.671
+6,presearch,direct,Where are the potato chips?,chips,potato chips,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Potato Chips to your cart — you'll find it in Aisle 5!"",
+  ""action"": ""move"",
+  ""targ",True,False,False,[],2.447
+6,llm_only,direct,Where are the potato chips?,chips,,none,[],"```json
+{
+  ""dialogue"": ""The potato chips are located in Aisle 5. Let me know if you need help finding anything else!"",
+",True,False,False,[],1.954
+7,presearch,direct,Can you help me find bottled water?,water,,none,[],"```json
+{
+  ""dialogue"": ""I'd be happy to help! Could you follow me, or would you like me to point you toward the drinks ",True,False,False,[],9.31
+7,llm_only,direct,Can you help me find bottled water?,water,,none,[],"```json
+{
+  ""dialogue"": ""Of course! You can find the bottled water in Aisle 4."",
+  ""action"": ""none"",
+  ""target_aisles"": ",True,False,False,[],1.603
+8,presearch,direct,I need a banana,banana,banana,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Banana to your cart — you'll find it in Aisle 3!"",
+  ""action"": ""move"",
+  ""target_ais",True,False,False,[],2.646
+8,llm_only,direct,I need a banana,banana,,none,[],"```json
+{
+  ""dialogue"": ""Of course! You can find bananas in Aisle 3."",
+  ""action"": ""none"",
+  ""target_aisles"": [3]
+}
+```",True,False,False,[],1.54
+9,presearch,direct,Do you sell croissants?,croissant,croissants,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, we do not carry croissants."",
+  ""action"": ""none"",
+  ""target_aisles"": []
+}
+```",True,False,False,[],2.244
+9,llm_only,direct,Do you sell croissants?,croissant,,none,[],"```json
+{
+  ""dialogue"": ""Yes, we do! You can find our croissants over in Aisle 2 in the bakery section."",
+  ""action"": ""n",True,False,False,[],1.746
+10,presearch,direct,I am looking for plain yogurt,yogurt,yogurt,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Plain Yogurt to your cart — you'll find it in Aisle 1!"",
+  ""action"": ""move"",
+  ""targ",True,False,False,[],2.478
+10,llm_only,direct,I am looking for plain yogurt,yogurt,,none,[],"```json
+{
+  ""dialogue"": ""Of course! You can find the plain yogurt in Aisle 1 in the dairy section."",
+  ""action"": ""none"",",True,False,False,[],1.714
+11,presearch,recipe,"I want to bake a birthday cake, what do I need?",flour; eggs; sugar; butter; milk,flour; eggs; sugar; butter; baking powder; milk; vanilla extract,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Milk (1L) and Milk (2L) to your cart—you'll find them in Aisle 1! Unfortunately, we ",True,False,False,[],6.148
+11,llm_only,recipe,"I want to bake a birthday cake, what do I need?",flour; eggs; sugar; butter; milk,,none,[],"```json
+{
+  ""dialogue"": ""That sounds like a lovely idea! While we don't have cake mix or flour, I can suggest some Milk ",True,False,False,[],2.202
+12,presearch,recipe,I need ingredients to make a salad,lettuce; tomato; carrot,lettuce; tomato; cucumber; onion; olive oil; vinegar; salt; pepper,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Lettuce and Tomato to your cart — you'll find both in Aisle 3! Unfortunately, we do ",True,False,False,[],3.401
+12,llm_only,recipe,I need ingredients to make a salad,lettuce; tomato; carrot,,none,[],"```json
+{
+  ""dialogue"": ""I can certainly help with that! You'll find lettuce, tomatoes, carrots, and broccoli over in Ai",True,False,False,[],1.863
+13,presearch,recipe,Can you help me find everything I need for a fruit smoothie?,banana; apple; orange; yogurt,,none,[],"```json
+{
+  ""dialogue"": ""I'd be happy to help you with that! Let's head over to the produce section to pick out some fre",True,False,False,[],3.151
+13,llm_only,recipe,Can you help me find everything I need for a fruit smoothie?,banana; apple; orange; yogurt,,none,[],"```json
+{
+  ""dialogue"": ""I'd be happy to help! You can find the apples, bananas, oranges, and grapes in Aisle 3, and the",True,False,False,[],2.195
+14,presearch,recipe,"I want to make breakfast, what do you have?",bread; milk; yogurt,,none,[],"```json
+{
+  ""dialogue"": ""Good morning! We have a wide variety of breakfast options; are you looking for something sweet,",True,False,False,[],3.248
+14,llm_only,recipe,"I want to make breakfast, what do you have?",bread; milk; yogurt,,none,[],"```json
+{
+  ""dialogue"": ""Good morning! For breakfast, we have milk, cheese, and yogurt in Aisle 1, a variety of breads a",True,False,False,[],3.713
+15,presearch,recipe,What do I need to make a cheese sandwich?,bread; cheese,,none,[],"```json
+{
+  ""dialogue"": ""For a classic cheese sandwich, you'll just need some bread and your favorite cheese! Would you ",True,False,False,[],3.544
+15,llm_only,recipe,What do I need to make a cheese sandwich?,bread; cheese,,none,[],"```json
+{
+  ""dialogue"": ""For a cheese sandwich, you'll need some bread from Aisle 2 and Cheddar Cheese from Aisle 1. Wou",True,False,False,[],6.871
+16,presearch,associative,I'm hosting a party and need snacks and drinks,chips; cookies; soda; juice,,none,[],"```json
+{
+  ""dialogue"": ""That sounds exciting! I'd be happy to help you pick out some great options; are you looking for",True,False,False,[],58.138
+16,llm_only,associative,I'm hosting a party and need snacks and drinks,chips; cookies; soda; juice,,none,[],"```json
+{
+  ""dialogue"": ""How exciting! You can find our drinks like Cola and juices in Aisle 4, and a great variety of s",True,False,False,[],7.429
+17,presearch,associative,I want something healthy for my lunch,apple; carrot; water,,none,[],"```json
+{
+  ""dialogue"": ""I'd be happy to help you with that! Are you looking for something like a fresh salad, some frui",True,False,False,[],3.135
+17,llm_only,associative,I want something healthy for my lunch,apple; carrot; water,,none,[],"```json
+{
+  ""dialogue"": ""I'd recommend some fresh vegetables like broccoli or lettuce from Aisle 3, and perhaps some whe",True,False,False,[],2.847
+18,presearch,associative,I need something sweet to snack on,cookies; donut; granola,chocolate; candy; cookies; fruit,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Chocolate Cookies to your cart — you'll find them in Aisle 5! Unfortunately, we do n",True,False,False,[],3.578
+18,llm_only,associative,I need something sweet to snack on,cookies; donut; granola,,none,[],"```json
+{
+  ""dialogue"": ""I can certainly help with that! We have chocolate cookies and glazed donuts, or maybe some grap",True,False,False,[],2.864
+19,presearch,associative,"I am going on a hike, what should I take?",water; nuts; granola,,none,[],"```json
+{
+  ""dialogue"": ""That sounds like a great trip! I'd recommend some water and some high-energy snacks; would you ",True,False,False,[],3.438
+19,llm_only,associative,"I am going on a hike, what should I take?",water; nuts; granola,,none,[],"```json
+{
+  ""dialogue"": ""That sounds like a great trip! I'd recommend some bottled water from Aisle 4, and some granola ",True,False,False,[],2.445
+20,presearch,associative,I want to make a hot beverage this morning,coffee; milk,coffee; tea; milk; sugar,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Coffee Beans (Aisle 4), Milk (1L) (Aisle 1), and Milk (2L) (Aisle 1) to your cart, b",True,False,False,[],20.516
+20,llm_only,associative,I want to make a hot beverage this morning,coffee; milk,,none,[],"```json
+{
+  ""dialogue"": ""Good morning! If you're looking for something to brew, we have coffee beans available in Aisle ",True,False,False,[],2.372
+21,presearch,not_in_store,Do you carry sushi ingredients?,,,none,[],"```json
+{
+  ""dialogue"": ""Yes, we do! I can help you find exactly what you need; are you looking for sushi rice, nori, or",True,True,False,[],3.694
+21,llm_only,not_in_store,Do you carry sushi ingredients?,,,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, but we don't have sushi ingredients in our current inventory. Is there anything else",True,True,False,[],2.326
+22,presearch,not_in_store,Where can I find dog food?,,dog food,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, but we do not carry dog food."",
+  ""action"": ""none"",
+  ""target_aisles"": []
+}
+```",True,True,False,[],2.581
+22,llm_only,not_in_store,Where can I find dog food?,,,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, but we don't have any dog food in our current inventory. Is there anything else I ca",True,True,False,[],2.184
+23,presearch,not_in_store,I need some fresh salmon,,salmon,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, we do not carry salmon."",
+  ""action"": ""none"",
+  ""target_aisles"": []
+}
+```",True,True,False,[],2.525
+23,llm_only,not_in_store,I need some fresh salmon,,,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, but we don't have any salmon in our inventory at the moment. Is there anything else ",True,True,False,[],2.254
+24,presearch,not_in_store,Do you sell pasta?,,pasta,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, we do not carry pasta."",
+  ""action"": ""none"",
+  ""target_aisles"": []
+}
+```",True,True,False,[],2.53
+24,llm_only,not_in_store,Do you sell pasta?,,,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, we don't have any pasta in our inventory at the moment. Is there anything else I can",True,True,False,[],2.231
+25,presearch,not_in_store,Can I get some ice cream?,,ice cream,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, but we do not carry ice cream."",
+  ""action"": ""none"",
+  ""target_aisles"": []
+}
+```",True,True,False,[],2.565
+25,llm_only,not_in_store,Can I get some ice cream?,,,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, we don't have any ice cream in stock at the moment."",
+  ""action"": ""none"",
+  ""target_",True,True,False,[],1.962
+26,presearch,conversational,"Hello there, how are you today?",,,none,[],"```json
+{
+  ""dialogue"": ""Hello! I'm doing great, thank you for asking. How can I help you find something today?"",
+  ""act",True,True,False,[],2.718
+26,llm_only,conversational,"Hello there, how are you today?",,,none,[],"```json
+{
+  ""dialogue"": ""Hello! I'm doing great, thank you for asking. How can I help you with your shopping today?"",
+  ",True,True,False,[],2.024
+27,presearch,conversational,What can you help me with?,,,none,[],"```json
+{
+  ""dialogue"": ""Hi there! I can help you find any products you're looking for or add items to your cart. Is the",True,True,False,[],3.537
+27,llm_only,conversational,What can you help me with?,,,none,[],"```json
+{
+  ""dialogue"": ""Hi there! I'm Alex. I can help you find any products you're looking for in the store and help y",True,True,False,[],2.418
+28,presearch,conversational,What are your opening hours?,,,none,[],"```json
+{
+  ""dialogue"": ""We're open every day from 8:00 AM to 10:00 PM. Is there anything else I can help you find today",True,True,False,[],3.02
+28,llm_only,conversational,What are your opening hours?,,,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, I don't have the store's opening hours on hand. Is there anything else I can help yo",True,True,False,[],2.219
+29,presearch,conversational,Hi! I'm new here. Can you explain how this store works?,,,none,[],"```json
+{
+  ""dialogue"": ""Welcome! We're glad to have you here. I can help you find products and add items to your cart a",True,True,False,[],3.17
+29,llm_only,conversational,Hi! I'm new here. Can you explain how this store works?,,,none,[],"```json
+{
+  ""dialogue"": ""Hi there! Welcome to our store. I can help you find any products you're looking for or add item",True,True,False,[],2.307
+30,presearch,conversational,Thank you for your help!,,,none,[],"```json
+{
+  ""dialogue"": ""You're very welcome! Let me know if there's anything else I can help you find today."",
+  ""actio",True,True,False,[],2.68
+30,llm_only,conversational,Thank you for your help!,,,none,[],"```json
+{
+  ""dialogue"": ""You're very welcome! Let me know if there's anything else I can help you find today."",
+  ""actio",True,True,False,[],1.978
+31,presearch,direct,I need milk and bananas,milk; banana,milk; banana,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Milk (1L) and Milk (2L) to your cart from Aisle 1, and Bananas from Aisle 3!"",
+  ""ac",True,False,False,[],3.694
+31,llm_only,direct,I need milk and bananas,milk; banana,,none,[],"```json
+{
+  ""dialogue"": ""Of course! You can find our milk in Aisle 1 and the bananas over in Aisle 3."",
+  ""action"": ""non",True,False,False,[],2.486
+32,presearch,direct,Can you add apples and oranges to my cart?,apple; orange,apple; orange,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Apples (Aisle 3), Apple Juice (Aisle 4), Oranges (Aisle 3), and Orange Juice (Aisle ",True,False,False,[],3.437
+32,llm_only,direct,Can you add apples and oranges to my cart?,apple; orange,,none,[],"```json
+{
+  ""dialogue"": ""Of course! I've added apples and oranges to your cart. You can find them both in Aisle 3."",
+  """,True,False,False,[],2.084
+33,presearch,direct,I would like broccoli and carrots,broccoli; carrot,broccoli; carrots,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Broccoli to your cart — you'll find it in Aisle 3! Unfortunately, we do not carry ca",True,False,False,[],3.092
+33,llm_only,direct,I would like broccoli and carrots,broccoli; carrot,,none,[],"```json
+{
+  ""dialogue"": ""Great choice! You can find both the broccoli and carrots over in Aisle 3."",
+  ""action"": ""none"",",True,False,False,[],1.882
+34,presearch,direct,Please get me wheat bread and coffee,bread; coffee,wheat bread; coffee,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Wheat Bread to your cart from Aisle 2 and Coffee Beans from Aisle 4!"",
+  ""action"": """,True,False,False,[],2.981
+34,llm_only,direct,Please get me wheat bread and coffee,bread; coffee,,none,[],"```json
+{
+  ""dialogue"": ""Of course! You can find the wheat bread in Aisle 2 and the coffee beans in Aisle 4."",
+  ""action",True,False,False,[],2.118
+35,presearch,direct,Do you have grapes and granola bars?,grape; granola,grapes; granola bars,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Grapes (1lb) to your cart — you'll find it in Aisle 3! Unfortunately, we do not carr",True,False,False,[],3.22
+35,llm_only,direct,Do you have grapes and granola bars?,grape; granola,,none,[],"```json
+{
+  ""dialogue"": ""Yes, we do! You can find the grapes in Aisle 3 and the granola bars in Aisle 5."",
+  ""action"": """,True,False,False,[],2.165
+36,presearch,recipe,I need ingredients to bake chocolate chip cookies,flour; eggs; sugar; butter,,none,[],"```json
+{
+  ""dialogue"": ""I can certainly help you with that! Since I don't have the specific list in front of me, would ",True,True,False,[],3.851
+36,llm_only,recipe,I need ingredients to bake chocolate chip cookies,flour; eggs; sugar; butter,,none,[],"```json
+{
+  ""dialogue"": ""I'd be happy to help! While I don't have flour or sugar in stock, I do have chocolate cookies i",True,True,False,[],2.426
+37,presearch,recipe,What do I need to make a vegetable stir fry?,broccoli; carrot; lettuce,broccoli; carrots; bell pepper; soy sauce; ginger; garlic; oil; cornstarch; sugar,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Broccoli to your cart — you'll find it in Aisle 3! Unfortunately, we do not carry ca",True,False,False,[],4.083
+37,llm_only,recipe,What do I need to make a vegetable stir fry?,broccoli; carrot; lettuce,,none,[],"```json
+{
+  ""dialogue"": ""For a vegetable stir fry, I'd recommend grabbing some carrots, broccoli, and lettuce from Aisle",True,False,False,[],2.337
+38,presearch,recipe,"I want to make pancakes, what ingredients do you have?",flour; milk; eggs,,none,[],"```json
+{
+  ""dialogue"": ""I'd be happy to help you find everything for your pancakes! Since I don't have a specific list ",True,False,False,[],3.991
+38,llm_only,recipe,"I want to make pancakes, what ingredients do you have?",flour; milk; eggs,,none,[],"```json
+{
+  ""dialogue"": ""For pancakes, we have milk in Aisle 1. Unfortunately, we don't have flour or eggs in our curren",True,False,False,[],2.922
+39,presearch,recipe,Help me find everything for a fruit salad,apple; banana; orange; grape,,none,[],"```json
+{
+  ""dialogue"": ""I'd be happy to help you with that! Let's head over to the produce section to pick out some fre",True,False,False,[],3.981
+39,llm_only,recipe,Help me find everything for a fruit salad,apple; banana; orange; grape,,none,[],"```json
+{
+  ""dialogue"": ""I can certainly help with that! You'll find our apples, bananas, oranges, and grapes all over i",True,False,False,[],2.149
+40,presearch,recipe,I need to bake banana bread,banana; flour; eggs,banana; flour; sugar; butter; eggs; baking soda; salt; vanilla extract,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Banana to your cart — you'll find it in Aisle 3! Unfortunately, we do not carry flou",True,False,False,[],4.033
+40,llm_only,recipe,I need to bake banana bread,banana; flour; eggs,,none,[],"```json
+{
+  ""dialogue"": ""That sounds delicious! You can find bananas in Aisle 3, and we have white or wheat bread in Ais",True,False,False,[],2.68
+41,presearch,associative,Something for my kids' lunchbox,apple; granola; yogurt; juice,,none,[],"```json
+{
+  ""dialogue"": ""I'd be happy to help you find some great snacks and meals for the kids! Are you looking for som",True,False,False,[],4.185
+41,llm_only,associative,Something for my kids' lunchbox,apple; granola; yogurt; juice,,none,[],"```json
+{
+  ""dialogue"": ""I have a few great options! You could grab some apple slices or bananas in Aisle 3, or maybe so",True,False,False,[],2.509
+42,presearch,associative,I want a healthy breakfast option,yogurt; granola; apple,,none,[],"```json
+{
+  ""dialogue"": ""I'd be happy to help you find something healthy! Do you have a preference, like oatmeal, fresh ",True,False,False,[],3.611
+42,llm_only,associative,I want a healthy breakfast option,yogurt; granola; apple,,none,[],"```json
+{
+  ""dialogue"": ""I'd recommend some plain yogurt from Aisle 1, and maybe some fresh bananas or apples from Aisle",True,False,False,[],2.591
+43,presearch,associative,What do you have for a movie night?,popcorn; soda; chips; cookies,,none,[],"```json
+{
+  ""dialogue"": ""Ooh, a movie night! I can definitely help you find some great snacks and drinks for that. What ",True,False,False,[],3.439
+43,llm_only,associative,What do you have for a movie night?,popcorn; soda; chips; cookies,,none,[],"```json
+{
+  ""dialogue"": ""For a movie night, I'd recommend heading to Aisle 5 for some potato chips, chocolate cookies, a",True,False,False,[],2.562
+44,presearch,associative,I need something for a late night snack,chips; cookies; nuts,chips; crackers; popcorn; fruit; chocolate,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Potato Chips, Popcorn, and Chocolate Cookies to your cart — you'll find them all in ",True,False,False,[],3.518
+44,llm_only,associative,I need something for a late night snack,chips; cookies; nuts,,none,[],"```json
+{
+  ""dialogue"": ""I'd be happy to help! For a late night snack, we have potato chips, chocolate cookies, and popc",True,False,False,[],2.204
+45,presearch,associative,I'm trying to eat more vegetables this week,broccoli; carrot; tomato; lettuce,vegetables,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, but we do not carry vegetables."",
+  ""action"": ""none"",
+  ""target_aisles"": []
+}
+```",True,False,False,[],2.484
+45,llm_only,associative,I'm trying to eat more vegetables this week,broccoli; carrot; tomato; lettuce,,none,[],"```json
+{
+  ""dialogue"": ""That's a great goal! You can find our carrots, broccoli, lettuce, and tomatoes all over in Aisl",True,False,False,[],2.14
+46,presearch,not_in_store,Do you stock flour?,,flour,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, we do not carry flour."",
+  ""action"": ""none"",
+  ""target_aisles"": []
+}
+```",True,True,False,[],13.248
+46,llm_only,not_in_store,Do you stock flour?,,,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, we don't have flour in stock at the moment."",
+  ""action"": ""none"",
+  ""target_aisles"":",True,True,False,[],1.957
+47,presearch,not_in_store,I need to find some eggs,,eggs,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, but we do not carry eggs."",
+  ""action"": ""none"",
+  ""target_aisles"": []
+}
+```",True,True,False,[],2.509
+47,llm_only,not_in_store,I need to find some eggs,,,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, but we don't seem to have any eggs in our current inventory. Is there anything else ",True,True,False,[],2.141
+48,presearch,not_in_store,Where is the butter?,,butter,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, but we do not carry butter."",
+  ""action"": ""none"",
+  ""target_aisles"": []
+}
+```",True,True,False,[],17.741
+48,llm_only,not_in_store,Where is the butter?,,,none,[],"```json
+{
+  ""dialogue"": ""I'm sorry, but we don't have any butter in our current inventory. Is there anything else I can ",True,True,False,[],2.141
+49,presearch,direct,Can I get 2 litres of milk please?,milk,milk,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Milk (1L) and Milk (2L) to your cart — you'll find both in Aisle 1!"",
+  ""action"": ""m",True,False,False,[],2.92
+49,llm_only,direct,Can I get 2 litres of milk please?,milk,,none,[],"```json
+{
+  ""dialogue"": ""Of course! You can find the 2L milk for $4.50 over in Aisle 1."",
+  ""action"": ""none"",
+  ""target_",True,False,False,[],2.018
+50,presearch,direct,I need cola and some mixed nuts,soda; nuts,cola; mixed nuts,none,[],"```json
+{
+  ""dialogue"": ""I'm adding Cola (2L) to your cart—you'll find it in Aisle 4, and I'm adding Mixed Nuts to your ",True,False,False,[],3.522
+50,llm_only,direct,I need cola and some mixed nuts,soda; nuts,,none,[],"```json
+{
+  ""dialogue"": ""Of course! You can find the Cola over in Aisle 4 and the Mixed Nuts in Aisle 5."",
+  ""action"": """,True,False,False,[],2.1

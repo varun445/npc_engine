@@ -68,7 +68,7 @@ def query_llm(prompt):
         response = requests.post(
             "http://localhost:11434/api/generate",
             json={
-                "model": "mistral",
+                "model": "gemma4:31b-cloud",
                 "prompt": prompt,
                 "stream": False,
             },
