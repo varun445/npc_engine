@@ -207,7 +207,9 @@ def _mock_generate_response(
     }
 
 
-def _mock_semantic_search(query: str, inventory: Inventory, top_k: int = 5) -> str:
+def _mock_semantic_search(
+    query: str, inventory: Inventory, top_k: int = 5, query_terms: list[str] | None = None
+) -> str:
     """Deterministic semantic-like retrieval for --mock runs."""
     query_lower = (query or "").lower()
     semantic_terms = []
@@ -232,7 +234,7 @@ def _mock_semantic_search(query: str, inventory: Inventory, top_k: int = 5) -> s
     if "snack" in query_lower:
         semantic_terms.extend(_terms_from_category("snacks"))
 
-    keyword_terms = _mock_extract_product_terms(query)
+    keyword_terms = query_terms if query_terms else _mock_extract_product_terms(query)
     semantic_terms.extend(keyword_terms)
 
     # Preserve order while deduplicating.
@@ -449,7 +451,8 @@ def _run_single_query(
     elif mode == "semantic":
         # Semantic mode — embed query and retrieve nearest inventory items.
         product_terms = []
-        observation = semantic_search_fn(query, inventory, top_k=5)
+        product_terms = inventory.extract_semantic_query_terms(query)
+        observation = semantic_search_fn(query, inventory, top_k=5, query_terms=product_terms)
         tool_observations = [observation]
     else:
         # llm_only — skip extraction and pre-search; send the query directly
@@ -521,7 +524,9 @@ def _build_pipeline_callables(mock: bool):
     from engine.llm_client import extract_product_terms, generate_shop_assistant_response
     return (
         extract_product_terms,
-        lambda query, inventory, top_k=5: inventory.semantic_search_inventory(query, top_k=top_k),
+        lambda query, inventory, top_k=5, query_terms=None: inventory.semantic_search_inventory(
+            query, top_k=top_k, query_terms=query_terms
+        ),
         generate_shop_assistant_response,
     )
 

@@ -2,6 +2,7 @@
 
 import math
 import os
+import re
 
 import requests
 
@@ -63,6 +64,8 @@ class Inventory:
         self.aisles = AISLE_LOCATIONS
         self._semantic_embedding_cache = {}
         self.embedding_endpoint = os.getenv("OLLAMA_EMBEDDINGS_URL", "http://localhost:11434/api/embeddings")
+        self._embedding_endpoint_fallback = os.getenv("OLLAMA_EMBED_URL", "http://localhost:11434/api/embed")
+        self._semantic_vector_db = {}
 
     def find_product(self, product_name):
         """Find a product by name across all categories"""
@@ -136,20 +139,67 @@ class Inventory:
             f"category: {category}. aisle: {self.aisles[category]}"
         )
 
+    def extract_semantic_query_terms(self, query, max_terms=8):
+        """Extract important terms from a query for semantic embedding."""
+        query_lower = (query or "").lower().strip()
+        if not query_lower:
+            return []
+
+        stopwords = {
+            "i", "me", "my", "we", "our", "you", "your", "the", "a", "an", "and", "or",
+            "to", "for", "of", "in", "on", "with", "some", "any", "something", "want",
+            "need", "find", "get", "give", "show", "where", "is", "are", "can", "please",
+        }
+
+        terms = []
+
+        # Keep full product phrases if directly present in the query.
+        for products in self.products.values():
+            for product in products:
+                name = product["name"].lower()
+                clean_name = re.sub(r"[^a-z0-9\s]", " ", name)
+                if clean_name and clean_name in query_lower:
+                    terms.append(clean_name.strip())
+
+                for token in re.findall(r"[a-z0-9]+", product["id"].lower()):
+                    if token and token in query_lower:
+                        terms.append(token)
+
+        tokens = re.findall(r"[a-z0-9]+", query_lower)
+        for token in tokens:
+            if len(token) <= 2 or token in stopwords:
+                continue
+            terms.append(token)
+
+        deduped = []
+        seen = set()
+        for term in terms:
+            key = term.strip().lower()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            deduped.append(key)
+            if len(deduped) >= max_terms:
+                break
+        return deduped
+
     def _ollama_embed(self, text, model):
-        try:
-            response = requests.post(
-                self.embedding_endpoint,
-                json={"model": model, "prompt": text},
-                timeout=10,
-            )
-            response.raise_for_status()
-            data = response.json()
-            embedding = data.get("embedding")
-            if isinstance(embedding, list) and embedding:
-                return embedding
-        except (requests.RequestException, ValueError, TypeError):
-            pass
+        payload = {"model": model, "prompt": text}
+        for endpoint in (self.embedding_endpoint, self._embedding_endpoint_fallback):
+            try:
+                response = requests.post(endpoint, json=payload, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+
+                embedding = data.get("embedding")
+                if isinstance(embedding, list) and embedding:
+                    return embedding
+
+                embeddings = data.get("embeddings")
+                if isinstance(embeddings, list) and embeddings and isinstance(embeddings[0], list):
+                    return embeddings[0]
+            except (requests.RequestException, ValueError, TypeError):
+                continue
         return None
 
     def _cosine_similarity(self, vec_a, vec_b):
@@ -162,7 +212,42 @@ class Inventory:
             return 0.0
         return dot / (norm_a * norm_b)
 
-    def semantic_search(self, query, top_k=5, model="nomic-embed-text", min_score=0.15):
+    def ensure_semantic_vector_db(self, model="nomic-embed-text"):
+        """Build and cache inventory embeddings for semantic lookup."""
+        if model in self._semantic_vector_db and self._semantic_vector_db[model]:
+            return True
+
+        vector_rows = []
+        for category, products in self.products.items():
+            aisle_num = self.aisles[category]
+            for product in products:
+                if product["stock"] <= 0:
+                    continue
+                cache_key = (model, product["id"])
+                if cache_key not in self._semantic_embedding_cache:
+                    self._semantic_embedding_cache[cache_key] = self._ollama_embed(
+                        self._semantic_text_for_product(product, category),
+                        model,
+                    )
+                embedding = self._semantic_embedding_cache[cache_key]
+                if not embedding:
+                    continue
+                vector_rows.append(
+                    {
+                        "product": product,
+                        "category": category,
+                        "aisle": aisle_num,
+                        "embedding": embedding,
+                    }
+                )
+        self._semantic_vector_db[model] = vector_rows
+        return len(vector_rows) > 0
+
+    def semantic_vector_count(self, model="nomic-embed-text"):
+        """Return the number of embedded inventory items stored for *model*."""
+        return len(self._semantic_vector_db.get(model, []))
+
+    def semantic_search(self, query, top_k=5, model="nomic-embed-text", min_score=0.15, query_terms=None):
         """Return top semantic matches from inventory for a free-form query.
 
         Args:
@@ -170,6 +255,7 @@ class Inventory:
             top_k: Maximum number of matches to return.
             model: Ollama embedding model name.
             min_score: Minimum cosine-similarity score to keep a match.
+            query_terms: Optional pre-extracted terms to embed instead of raw query.
         """
         query = (query or "").strip()
         if not query:
@@ -181,57 +267,62 @@ class Inventory:
         if top_k <= 0:
             return []
 
-        query_embedding = self._ollama_embed(query, model)
-        if not query_embedding:
+        terms_to_embed = query_terms if query_terms else self.extract_semantic_query_terms(query)
+        if not terms_to_embed:
+            terms_to_embed = [query]
+
+        query_embeddings = []
+        for term in terms_to_embed:
+            term_embedding = self._ollama_embed(term, model)
+            if term_embedding:
+                query_embeddings.append(term_embedding)
+
+        if not query_embeddings:
+            return []
+
+        if not self.ensure_semantic_vector_db(model=model):
             return []
 
         scored = []
-        for category, products in self.products.items():
-            aisle_num = self.aisles[category]
-            for product in products:
-                if product["stock"] <= 0:
-                    continue
-
-                cache_key = (model, product["id"])
-                if cache_key not in self._semantic_embedding_cache:
-                    self._semantic_embedding_cache[cache_key] = self._ollama_embed(
-                        self._semantic_text_for_product(product, category),
-                        model,
-                    )
-                product_embedding = self._semantic_embedding_cache[cache_key]
-                if not product_embedding:
-                    continue
-
-                score = self._cosine_similarity(query_embedding, product_embedding)
-                if score >= min_score:
-                    scored.append(
-                        {
-                            "product": product,
-                            "category": category,
-                            "aisle": aisle_num,
-                            "score": score,
-                        }
-                    )
+        for row in self._semantic_vector_db.get(model, []):
+            score = max(
+                self._cosine_similarity(query_vec, row["embedding"])
+                for query_vec in query_embeddings
+            )
+            if score >= min_score:
+                scored.append(
+                    {
+                        "product": row["product"],
+                        "category": row["category"],
+                        "aisle": row["aisle"],
+                        "score": score,
+                    }
+                )
 
         scored.sort(key=lambda item: item["score"], reverse=True)
         return scored[:top_k]
 
-    def semantic_search_inventory(self, query, top_k=5, model="nomic-embed-text", min_score=0.15):
+    def semantic_search_inventory(
+        self, query, top_k=5, model="nomic-embed-text", min_score=0.15, query_terms=None
+    ):
         """Search inventory semantically and format as a tool observation string."""
         matches = self.semantic_search(
             query=query,
             top_k=top_k,
             model=model,
             min_score=min_score,
+            query_terms=query_terms,
         )
         if not matches:
-            return SEARCH_RESULTS_PREFIX + f"{query}: not found in store inventory"
+            label = ", ".join(query_terms) if query_terms else query
+            return SEARCH_RESULTS_PREFIX + f"{label}: not found in store inventory"
 
         formatted_matches = [
             self._format_match(item["product"], item["aisle"])
             for item in matches
         ]
-        return SEARCH_RESULTS_PREFIX + f"{query}: {', '.join(formatted_matches)}"
+        label = ", ".join(query_terms) if query_terms else query
+        return SEARCH_RESULTS_PREFIX + f"{label}: {', '.join(formatted_matches)}"
 
     def search_inventory(self, search_terms):
         """Search inventory for a list of search terms.
