@@ -9,6 +9,9 @@ from models.inventory import SEARCH_RESULTS_PREFIX
 # dialogue snippet).  The full Ollama API metadata (eval counts, timings,
 # etc.) is never printed — only the text "response" field is shown.
 DEBUG = True
+MIN_SCORE_WITH_QUERY_OVERLAP = 0.22
+MIN_SCORE_NO_OVERLAP = 0.55
+HIGH_CONFIDENCE_FALLBACK_SCORE = 0.80
 
 
 def _log(msg):
@@ -205,11 +208,16 @@ def _format_search_observations(tool_observations, customer_query=""):
                         continue
 
                     selected = [
-                        c for c in candidates if (c["overlap"] > 0 and c["score"] >= 0.22) or c["score"] >= 0.55
+                        c
+                        for c in candidates
+                        if (
+                            (c["overlap"] > 0 and c["score"] >= MIN_SCORE_WITH_QUERY_OVERLAP)
+                            or c["score"] >= MIN_SCORE_NO_OVERLAP
+                        )
                     ]
                     if not selected:
                         best = max(candidates, key=lambda c: c["score"])
-                        if best["score"] >= 0.80:
+                        if best["score"] >= HIGH_CONFIDENCE_FALLBACK_SCORE:
                             selected = [best]
 
                     selected.sort(key=lambda c: (c["overlap"], c["score"]), reverse=True)
