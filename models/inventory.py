@@ -63,8 +63,14 @@ class Inventory:
         self.products = PRODUCTS
         self.aisles = AISLE_LOCATIONS
         self._semantic_embedding_cache = {}
-        self.embedding_endpoint = os.getenv("OLLAMA_EMBEDDINGS_URL", "http://localhost:11434/api/embeddings")
-        self._embedding_endpoint_fallback = os.getenv("OLLAMA_EMBED_URL", "http://localhost:11434/api/embed")
+        self._embedding_endpoint = os.getenv(
+            "OLLAMA_EMBEDDING_URL",
+            os.getenv("OLLAMA_EMBEDDINGS_URL", "http://localhost:11434/api/embeddings"),
+        )
+        self._embedding_endpoint_fallback = os.getenv(
+            "OLLAMA_EMBEDDING_FALLBACK_URL",
+            os.getenv("OLLAMA_EMBED_URL", "http://localhost:11434/api/embed"),
+        )
         self._semantic_vector_db = {}
 
     def find_product(self, product_name):
@@ -185,7 +191,7 @@ class Inventory:
 
     def _ollama_embed(self, text, model):
         payload = {"model": model, "prompt": text}
-        for endpoint in (self.embedding_endpoint, self._embedding_endpoint_fallback):
+        for endpoint in (self._embedding_endpoint, self._embedding_endpoint_fallback):
             try:
                 response = requests.post(endpoint, json=payload, timeout=10)
                 response.raise_for_status()
@@ -247,7 +253,7 @@ class Inventory:
         """Return the number of embedded inventory items stored for *model*."""
         return len(self._semantic_vector_db.get(model, []))
 
-    def semantic_search(self, query, top_k=5, model="nomic-embed-text", min_score=0.15, query_terms=None):
+    def semantic_search(self, query, query_terms=None, top_k=5, model="nomic-embed-text", min_score=0.15):
         """Return top semantic matches from inventory for a free-form query.
 
         Args:
@@ -285,10 +291,15 @@ class Inventory:
 
         scored = []
         for row in self._semantic_vector_db.get(model, []):
-            score = max(
+            per_term_scores = [
                 self._cosine_similarity(query_vec, row["embedding"])
                 for query_vec in query_embeddings
-            )
+            ]
+            max_score = max(per_term_scores)
+            avg_score = sum(per_term_scores) / len(per_term_scores)
+            # Blend peak term hit and overall term alignment so exact product words
+            # score strongly while still rewarding multi-term query consistency.
+            score = (0.65 * max_score) + (0.35 * avg_score)
             if score >= min_score:
                 scored.append(
                     {
@@ -303,15 +314,15 @@ class Inventory:
         return scored[:top_k]
 
     def semantic_search_inventory(
-        self, query, top_k=5, model="nomic-embed-text", min_score=0.15, query_terms=None
+        self, query, query_terms=None, top_k=5, model="nomic-embed-text", min_score=0.15
     ):
         """Search inventory semantically and format as a tool observation string."""
         matches = self.semantic_search(
             query=query,
+            query_terms=query_terms,
             top_k=top_k,
             model=model,
             min_score=min_score,
-            query_terms=query_terms,
         )
         if not matches:
             label = ", ".join(query_terms) if query_terms else query

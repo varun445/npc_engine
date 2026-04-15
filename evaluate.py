@@ -238,16 +238,16 @@ def _mock_semantic_search(
     semantic_terms.extend(keyword_terms)
 
     # Preserve order while deduplicating.
-    deduped_terms = []
+    deduplicated_terms = []
     seen = set()
     for term in semantic_terms:
         key = term.strip().lower()
         if key and key not in seen:
             seen.add(key)
-            deduped_terms.append(term)
+            deduplicated_terms.append(term)
 
-    if not deduped_terms:
-        deduped_terms = query_lower.split()
+    if not deduplicated_terms:
+        deduplicated_terms = query_lower.split()
 
     # Reuse deterministic exact matcher but cap to top_k output products.
     try:
@@ -257,7 +257,7 @@ def _mock_semantic_search(
     if top_k <= 0:
         return f"Search Results: {query}: not found in store inventory"
 
-    matched = inventory.find_products_by_terms(deduped_terms)[:top_k]
+    matched = inventory.find_products_by_terms(deduplicated_terms)[:top_k]
     if not matched:
         return f"Search Results: {query}: not found in store inventory"
 
@@ -450,7 +450,6 @@ def _run_single_query(
             tool_observations.append(observation)
     elif mode == "semantic":
         # Semantic mode — embed query and retrieve nearest inventory items.
-        product_terms = []
         product_terms = inventory.extract_semantic_query_terms(query)
         observation = semantic_search_fn(query, inventory, top_k=5, query_terms=product_terms)
         tool_observations = [observation]
@@ -844,7 +843,7 @@ def _parse_args() -> argparse.Namespace:
             "'semantic' (embedding retrieval + generation), "
             "'llm_only' (no pre-search, but includes inventory context), or "
             "'all' (compare all three per query). "
-            "'both' is kept as a legacy alias for presearch + llm_only."
+            "'both' is a deprecated alias for presearch + llm_only."
         ),
     )
     parser.add_argument(
