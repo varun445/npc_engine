@@ -80,10 +80,14 @@ class Inventory:
             "OLLAMA_EMBEDDING_FALLBACK_URL",
             os.getenv("OLLAMA_EMBED_URL", "http://localhost:11434/api/embed"),
         )
+        self._embedding_config_warning = ""
         try:
             self._embedding_timeout_s = float(os.getenv("OLLAMA_EMBEDDING_TIMEOUT", "30"))
         except ValueError:
             self._embedding_timeout_s = 30.0
+            self._embedding_config_warning = (
+                "Invalid OLLAMA_EMBEDDING_TIMEOUT value; using default timeout of 30s."
+            )
         self._last_embedding_error = ""
         self._semantic_vector_db = {}
 
@@ -213,15 +217,16 @@ class Inventory:
             ]
 
         def _is_numeric_vector(value):
+            def _is_finite_number(x):
+                if not isinstance(x, (int, float)):
+                    return False
+                numeric = float(x)
+                return not math.isnan(numeric) and not math.isinf(numeric)
+
             return (
                 isinstance(value, list)
                 and len(value) > 0
-                and all(
-                    isinstance(x, (int, float))
-                    and not math.isnan(float(x))
-                    and not math.isinf(float(x))
-                    for x in value
-                )
+                and all(_is_finite_number(x) for x in value)
             )
 
         def _extract_embedding(data):
@@ -265,7 +270,9 @@ class Inventory:
 
     def get_last_embedding_error(self):
         """Return last embedding-request error detail, if any."""
-        return self._last_embedding_error
+        if self._embedding_config_warning and self._last_embedding_error:
+            return f"{self._embedding_config_warning} {self._last_embedding_error}"
+        return self._last_embedding_error or self._embedding_config_warning
 
     def get_embedding_endpoints(self):
         """Return configured primary/fallback embedding endpoints."""
