@@ -1,6 +1,7 @@
 # Product Inventory System for Shop Assistant
 
 import math
+import os
 
 import requests
 
@@ -61,6 +62,7 @@ class Inventory:
         self.products = PRODUCTS
         self.aisles = AISLE_LOCATIONS
         self._semantic_embedding_cache = {}
+        self.embedding_endpoint = os.getenv("OLLAMA_EMBEDDINGS_URL", "http://localhost:11434/api/embeddings")
 
     def find_product(self, product_name):
         """Find a product by name across all categories"""
@@ -137,15 +139,16 @@ class Inventory:
     def _ollama_embed(self, text, model):
         try:
             response = requests.post(
-                "http://localhost:11434/api/embeddings",
+                self.embedding_endpoint,
                 json={"model": model, "prompt": text},
                 timeout=10,
             )
+            response.raise_for_status()
             data = response.json()
             embedding = data.get("embedding")
             if isinstance(embedding, list) and embedding:
                 return embedding
-        except Exception:
+        except (requests.RequestException, ValueError, TypeError):
             pass
         return None
 
@@ -160,9 +163,22 @@ class Inventory:
         return dot / (norm_a * norm_b)
 
     def semantic_search(self, query, top_k=5, model="nomic-embed-text", min_score=0.15):
-        """Return top semantic matches from inventory for a free-form query."""
+        """Return top semantic matches from inventory for a free-form query.
+
+        Args:
+            query: Raw customer query text to embed.
+            top_k: Maximum number of matches to return.
+            model: Ollama embedding model name.
+            min_score: Minimum cosine-similarity score to keep a match.
+        """
         query = (query or "").strip()
         if not query:
+            return []
+        try:
+            top_k = int(top_k)
+        except (TypeError, ValueError):
+            top_k = 5
+        if top_k <= 0:
             return []
 
         query_embedding = self._ollama_embed(query, model)
@@ -198,7 +214,7 @@ class Inventory:
                     )
 
         scored.sort(key=lambda item: item["score"], reverse=True)
-        return scored[:max(1, int(top_k))]
+        return scored[:top_k]
 
     def semantic_search_inventory(self, query, top_k=5, model="nomic-embed-text", min_score=0.15):
         """Search inventory semantically and format as a tool observation string."""

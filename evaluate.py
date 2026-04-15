@@ -212,12 +212,25 @@ def _mock_semantic_search(query: str, inventory: Inventory, top_k: int = 5) -> s
     query_lower = (query or "").lower()
     semantic_terms = []
 
+    def _terms_from_category(category_name: str) -> list[str]:
+        return [p["id"] for p in inventory.products.get(category_name, []) if p.get("stock", 0) > 0]
+
     if "healthy" in query_lower or "health" in query_lower:
-        semantic_terms.extend(["apple", "banana", "carrot", "broccoli", "yogurt", "water"])
+        semantic_terms.extend(_terms_from_category("fruits"))
+        semantic_terms.extend(_terms_from_category("vegetables"))
+        semantic_terms.extend(
+            [
+                p["id"]
+                for products in inventory.products.values()
+                for p in products
+                if p.get("stock", 0) > 0
+                and ("yogurt" in p["id"].lower() or "water" in p["id"].lower())
+            ]
+        )
     if "drink" in query_lower or "thirst" in query_lower or "beverage" in query_lower:
-        semantic_terms.extend(["water", "juice", "coffee"])
+        semantic_terms.extend(_terms_from_category("beverages"))
     if "snack" in query_lower:
-        semantic_terms.extend(["granola", "nuts", "popcorn"])
+        semantic_terms.extend(_terms_from_category("snacks"))
 
     keyword_terms = _mock_extract_product_terms(query)
     semantic_terms.extend(keyword_terms)
@@ -235,7 +248,14 @@ def _mock_semantic_search(query: str, inventory: Inventory, top_k: int = 5) -> s
         deduped_terms = query_lower.split()
 
     # Reuse deterministic exact matcher but cap to top_k output products.
-    matched = inventory.find_products_by_terms(deduped_terms)[: max(1, int(top_k))]
+    try:
+        top_k = int(top_k)
+    except (TypeError, ValueError):
+        top_k = 5
+    if top_k <= 0:
+        return f"Search Results: {query}: not found in store inventory"
+
+    matched = inventory.find_products_by_terms(deduped_terms)[:top_k]
     if not matched:
         return f"Search Results: {query}: not found in store inventory"
 
@@ -429,7 +449,7 @@ def _run_single_query(
     elif mode == "semantic":
         # Semantic mode — embed query and retrieve nearest inventory items.
         product_terms = []
-        observation = semantic_search_fn(query, inventory)
+        observation = semantic_search_fn(query, inventory, top_k=5)
         tool_observations = [observation]
     else:
         # llm_only — skip extraction and pre-search; send the query directly
@@ -501,7 +521,7 @@ def _build_pipeline_callables(mock: bool):
     from engine.llm_client import extract_product_terms, generate_shop_assistant_response
     return (
         extract_product_terms,
-        lambda query, inventory: inventory.semantic_search_inventory(query),
+        lambda query, inventory, top_k=5: inventory.semantic_search_inventory(query, top_k=top_k),
         generate_shop_assistant_response,
     )
 
@@ -898,6 +918,8 @@ def main() -> int:
 
     # ── Print run header ──────────────────────────────────────────────────
     llm_label = "MOCK (no Ollama)" if args.mock else "LIVE (Ollama/Mistral)"
+    if args.mode == "both":
+        print("[INFO] '--mode both' is a legacy alias. Prefer '--mode all' for full comparison.")
     print(f"\nNPC Engine — LLM Pipeline Evaluation")
     print(f"LLM     : {llm_label}")
     print(f"Mode    : {args.mode}")
