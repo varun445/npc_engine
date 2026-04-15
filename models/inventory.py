@@ -80,7 +80,10 @@ class Inventory:
             "OLLAMA_EMBEDDING_FALLBACK_URL",
             os.getenv("OLLAMA_EMBED_URL", "http://localhost:11434/api/embed"),
         )
-        self._embedding_timeout_s = float(os.getenv("OLLAMA_EMBEDDING_TIMEOUT", "30"))
+        try:
+            self._embedding_timeout_s = float(os.getenv("OLLAMA_EMBEDDING_TIMEOUT", "30"))
+        except ValueError:
+            self._embedding_timeout_s = 30.0
         self._last_embedding_error = ""
         self._semantic_vector_db = {}
 
@@ -213,7 +216,12 @@ class Inventory:
             return (
                 isinstance(value, list)
                 and len(value) > 0
-                and all(isinstance(x, (int, float)) for x in value)
+                and all(
+                    isinstance(x, (int, float))
+                    and not math.isnan(float(x))
+                    and not math.isinf(float(x))
+                    for x in value
+                )
             )
 
         def _extract_embedding(data):
