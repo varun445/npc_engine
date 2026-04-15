@@ -148,6 +148,20 @@ ROLLING_RESULTS_FILENAME = "results.csv"
 
 def _mock_extract_product_terms(query: str) -> list[str]:
     """Simple keyword extraction that doesn't need an LLM."""
+    query_lower = (query or "").lower()
+
+    # Keep parity with recipe-style extraction in the real LLM pipeline.
+    recipe_map = {
+        "cake": ["milk", "cheese", "bread_white", "yogurt"],
+        "salad": ["lettuce", "tomato", "carrot", "broccoli"],
+        "smoothie": ["banana", "apple", "orange", "yogurt"],
+        "breakfast": ["milk", "bread_white", "banana", "coffee"],
+        "sandwich": ["bread_white", "cheese", "tomato", "lettuce"],
+    }
+    for key, ingredients in recipe_map.items():
+        if key in query_lower:
+            return ingredients
+
     inventory = Inventory()
     all_names = []
     for products in inventory.products.values():
@@ -155,7 +169,6 @@ def _mock_extract_product_terms(query: str) -> list[str]:
             all_names.append(p["name"].lower())
             all_names.append(p["id"].lower())
     found = []
-    query_lower = query.lower()
     # Prefer longer names first to avoid sub-string false-matches
     for name in sorted(all_names, key=len, reverse=True):
         if name in query_lower and name not in found:
@@ -170,6 +183,7 @@ def _mock_generate_response(
     memory: list,
     tool_observations: list | None,
     include_inventory_in_no_search: bool = False,
+    retrieval_mode: str = "presearch",
 ) -> dict:
     """Return a minimal valid JSON response without calling the LLM."""
     if not tool_observations:
@@ -478,8 +492,15 @@ def _run_single_query(
             observation = inventory.search_inventory(product_terms)
             tool_observations.append(observation)
     elif mode == "semantic":
-        # Semantic mode — embed query and retrieve nearest inventory items.
-        product_terms = inventory.extract_semantic_query_terms(query)
+        # Semantic mode (2-step):
+        # 1) run product/recipe extraction first (same intent extraction as presearch),
+        # 2) run semantic retrieval over extracted terms; fall back to semantic query terms
+        #    for associative requests (e.g. "healthy", "snack", "drink").
+        extracted_terms = extract_fn(query)
+        if extracted_terms:
+            product_terms = extracted_terms
+        else:
+            product_terms = inventory.extract_semantic_query_terms(query)
         observation = semantic_search_fn(query, inventory, top_k=5, query_terms=product_terms)
         tool_observations = [observation]
     else:
@@ -495,6 +516,7 @@ def _run_single_query(
         [],              # empty memory for independent per-query evaluation
         tool_observations,
         include_inventory_in_no_search=(mode == "llm_only"),
+        retrieval_mode=mode,
     )
 
     t_end = time.perf_counter()

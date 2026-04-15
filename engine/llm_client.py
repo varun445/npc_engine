@@ -241,6 +241,7 @@ def generate_shop_assistant_response(
     memory,
     tool_observations=None,
     include_inventory_in_no_search=False,
+    retrieval_mode="presearch",
 ):
     """Generate a final Format B response from the shop assistant.
 
@@ -328,6 +329,15 @@ Reply with ONLY valid JSON in this exact format and nothing else:
             for name in not_found_names:
                 search_section += f"  NOT FOUND: {name}\n"
 
+        semantic_instructions = ""
+        if retrieval_mode == "semantic":
+            semantic_instructions = """
+- SEMANTIC MODE: Treat FOUND items as the only grounded candidates from similarity retrieval.
+- If the customer asked for a recipe/dish, treat FOUND items as matched ingredients and mention only those ingredients.
+- If the customer asked an associative preference (e.g. healthy, light, high-protein), treat FOUND items as recommendations for that preference.
+- If the FOUND section is empty, clearly say you could not match the requested products/preference in inventory and ask for a more specific product name.
+"""
+
         prompt = f"""{preamble}
 
 {memory_text}{search_section}
@@ -340,6 +350,7 @@ Instructions:
 - For every item in the NOT FOUND section: tell the customer we do not carry it.
 - If found items are in different aisles, list only those FOUND-item aisle numbers in target_aisles.
 - Keep your response to 1-2 sentences.
+{semantic_instructions}
 
 ACTION RULES (follow exactly):
 - If the FOUND section above contains any items → set action to "move" and list every
@@ -379,7 +390,7 @@ Reply with ONLY valid JSON in this exact format and nothing else:
                 result["target_aisles"] = []
         # Ground aisles to inventory-backed FOUND lines only.
         if tool_observations:
-            _, _, grounded_aisles = _format_search_observations(
+            grounded_found_lines, _, grounded_aisles = _format_search_observations(
                 tool_observations, customer_query=customer_query
             )
             if grounded_aisles:
@@ -395,6 +406,10 @@ Reply with ONLY valid JSON in this exact format and nothing else:
                 result["target_aisles"] = filtered_aisles
             else:
                 result["target_aisles"] = []
+            if not result["target_aisles"] and not grounded_found_lines:
+                result["action"] = "none"
+            elif result["target_aisles"]:
+                result["action"] = "move"
         # Safeguard: if aisles are populated the action must be "move".
         # A model may correctly identify aisles but forget to set the action.
         # (The conversational path hardcodes target_aisles=[] so this never
