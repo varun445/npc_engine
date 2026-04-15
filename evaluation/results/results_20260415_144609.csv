@@ -1,0 +1,6 @@
+id,mode,query_type,query,expected_items,product_terms_extracted,action,target_aisles,dialogue_snippet,json_adherent,task_success,hallucinated,hallucinated_aisles,latency_s
+1,semantic,direct,Where can I find milk?,milk,milk,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
+2,semantic,direct,Do you have cheddar cheese?,cheese,cheddar cheese; cheese; have; cheddar,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
+3,semantic,direct,I need some apples please,apple,apple; apples,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+4,semantic,direct,Can I get a loaf of white bread?,bread,white bread; bread; white; loaf,move,[2],I found those items. They are in Aisle(s) 2.,True,True,False,[],0.0
+5,semantic,direct,I would like some orange juice,juice,orange; orange juice; juice; would; like,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
