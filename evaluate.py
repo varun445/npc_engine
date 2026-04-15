@@ -24,15 +24,19 @@ Evaluation Modes (--mode)
         tool hook) → response generation.  This is the grounded, anti-
         hallucination architecture described in the project thesis.
 
+    semantic
+        Semantic retrieval pipeline: embed the full user query and retrieve
+        top-k nearest in-stock inventory items, then generate the response
+        from those grounded tool observations.
+
     llm_only
         The query is sent directly to the response-generation step with no
         deterministic inventory pre-search, but with full inventory context in
         the prompt.
 
-    both
-        Runs every query through *both* modes (presearch first, then
-        llm_only) and saves two labelled rows per query.  Use this for the
-        side-by-side experimental comparison described in the thesis.
+    all
+        Runs every query through all modes (presearch, semantic, llm_only)
+        and saves three labelled rows per query for side-by-side comparison.
 
 Checkpointing / Resume Support
 --------------------------------
@@ -52,8 +56,8 @@ Usage
     # Dry-run with a mock LLM (no Ollama needed — for CI / unit testing):
     python evaluate.py --mock
 
-    # Experimental comparison (LLM with vs. without inventory search):
-    python evaluate.py --mode both
+    # Experimental comparison across all pipelines:
+    python evaluate.py --mode all
 
     # Baseline only (vanilla LLM, no search):
     python evaluate.py --mode llm_only
@@ -79,20 +83,20 @@ Design Notes (for thesis appendix)
 ------------------------------------
 The evaluation script implements *incremental, resumable benchmarking*:
 
-  1. After each query (or pair of queries in ``--mode both``) the result row(s)
+  1. After each query (or per-query mode bundle in comparison modes) the result row(s)
      are appended to ``results.csv`` so that a crash or keyboard interrupt only
      loses the current in-flight query.
 
   2. On startup, ``_count_existing_results`` reads the row count from the
      rolling CSV.  For a single-mode run this equals the number of completed
-     queries; for a ``both``-mode run it equals ``completed_queries × 2``, so
-     the resume index is ``row_count // 2``.
+      queries; for an ``all``-mode run it equals ``completed_queries × 3``, so
+      the resume index is ``row_count // 3``.
 
-  3. The ``--mode both`` comparison is implemented by running each query twice
-     through ``_run_single_query``, once per mode, and saving both rows before
+  3. The ``--mode all`` comparison is implemented by running each query for
+     each comparison mode through ``_run_single_query`` and saving all rows before
      moving to the next query.  This keeps the per-query checkpoint atomic:
-     either both rows for a query are saved or neither are (the checkpoint is
-     written after both calls complete).
+     either all rows for a query are saved or none are (the checkpoint is
+     written after all mode calls complete).
 
   4. The ``mode`` column in the CSV makes it straightforward to load the data
      in a notebook and split rows by mode for metric comparison:
@@ -203,6 +207,60 @@ def _mock_generate_response(
     }
 
 
+def _mock_semantic_search(query: str, inventory: Inventory, top_k: int = 5) -> str:
+    """Deterministic semantic-like retrieval for --mock runs."""
+    query_lower = (query or "").lower()
+    semantic_terms = []
+
+    if "healthy" in query_lower or "health" in query_lower:
+        semantic_terms.extend(["apple", "banana", "carrot", "broccoli", "yogurt", "water"])
+    if "drink" in query_lower or "thirst" in query_lower or "beverage" in query_lower:
+        semantic_terms.extend(["water", "juice", "coffee"])
+    if "snack" in query_lower:
+        semantic_terms.extend(["granola", "nuts", "popcorn"])
+
+    keyword_terms = _mock_extract_product_terms(query)
+    semantic_terms.extend(keyword_terms)
+
+    # Preserve order while deduplicating.
+    deduped_terms = []
+    seen = set()
+    for term in semantic_terms:
+        key = term.strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            deduped_terms.append(term)
+
+    if not deduped_terms:
+        deduped_terms = query_lower.split()
+
+    # Reuse deterministic exact matcher but cap to top_k output products.
+    matched = inventory.find_products_by_terms(deduped_terms)[: max(1, int(top_k))]
+    if not matched:
+        return f"Search Results: {query}: not found in store inventory"
+
+    matches_with_aisle = []
+    for product in matched:
+        category = next(
+            (
+                cat
+                for cat, products in inventory.products.items()
+                if any(p["id"] == product["id"] for p in products)
+            ),
+            None,
+        )
+        aisle_num = inventory.aisles.get(category) if category else None
+        if aisle_num is None:
+            continue
+        matches_with_aisle.append(
+            f"{product['name']} (Aisle {aisle_num}, ${product['price']:.2f}, {product['stock']} in stock)"
+        )
+
+    if not matches_with_aisle:
+        return f"Search Results: {query}: not found in store inventory"
+    return f"Search Results: {query}: {', '.join(matches_with_aisle)}"
+
+
 # ---------------------------------------------------------------------------
 # Hallucination detection helpers
 # ---------------------------------------------------------------------------
@@ -309,6 +367,7 @@ def _run_single_query(
     inventory: "Inventory",
     inventory_summary: str,
     extract_fn,
+    semantic_search_fn,
     generate_fn,
     mode: str,
     verbose: bool,
@@ -333,6 +392,7 @@ def _run_single_query(
         Callable that generates the shop-assistant JSON response.
     mode:
         ``"presearch"`` — full pipeline (extraction + search + generation).
+        ``"semantic"``  — semantic retrieval (embedding similarity + generation).
         ``"llm_only"``  — generation without deterministic lookup; includes
         full inventory context in the prompt.
     verbose:
@@ -366,6 +426,11 @@ def _run_single_query(
         if product_terms:
             observation = inventory.search_inventory(product_terms)
             tool_observations.append(observation)
+    elif mode == "semantic":
+        # Semantic mode — embed query and retrieve nearest inventory items.
+        product_terms = []
+        observation = semantic_search_fn(query, inventory)
+        tool_observations = [observation]
     else:
         # llm_only — skip extraction and pre-search; send the query directly
         product_terms = []
@@ -430,11 +495,15 @@ def _run_single_query(
 
 
 def _build_pipeline_callables(mock: bool):
-    """Return ``(extract_fn, generate_fn)`` for the requested LLM backend."""
+    """Return ``(extract_fn, semantic_search_fn, generate_fn)`` for the requested backend."""
     if mock:
-        return _mock_extract_product_terms, _mock_generate_response
+        return _mock_extract_product_terms, _mock_semantic_search, _mock_generate_response
     from engine.llm_client import extract_product_terms, generate_shop_assistant_response
-    return extract_product_terms, generate_shop_assistant_response
+    return (
+        extract_product_terms,
+        lambda query, inventory: inventory.semantic_search_inventory(query),
+        generate_shop_assistant_response,
+    )
 
 
 def run_evaluation(
@@ -457,6 +526,7 @@ def run_evaluation(
     mode:
         ``"presearch"`` — full pipeline (term extraction + inventory search +
         generation).
+        ``"semantic"``  — semantic retrieval (embedding similarity + generation).
         ``"llm_only"``  — generation without inventory pre-search, but with
         full inventory context in the prompt.
     checkpoint_path:
@@ -465,7 +535,7 @@ def run_evaluation(
     """
     inventory = Inventory()
     inventory_summary = _build_inventory_summary(inventory)
-    extract_fn, generate_fn = _build_pipeline_callables(mock)
+    extract_fn, semantic_search_fn, generate_fn = _build_pipeline_callables(mock)
 
     results: list[dict] = []
     total = len(queries)
@@ -473,7 +543,7 @@ def run_evaluation(
     for idx, item in enumerate(queries, start=1):
         result_row = _run_single_query(
             item, idx, total, inventory, inventory_summary,
-            extract_fn, generate_fn, mode, verbose,
+            extract_fn, semantic_search_fn, generate_fn, mode, verbose,
         )
         results.append(result_row)
 
@@ -483,52 +553,39 @@ def run_evaluation(
     return results
 
 
-def _run_both_modes(
+def _run_comparison_modes(
     queries: list[dict],
     mock: bool = False,
     verbose: bool = True,
+    modes: list[str] | None = None,
     checkpoint_path: str | None = None,
 ) -> list[dict]:
-    """Run each query in both ``presearch`` and ``llm_only`` modes.
-
-    For each query the presearch row is recorded first, followed by the
-    llm_only row.  When *checkpoint_path* is provided, both rows for a query
-    are appended to the file **after both calls complete**, so a crash only
-    ever loses the current query's pair (not a partial pair).
-
-    This interleaved layout makes it easy to load the CSV in a notebook and
-    compare modes side-by-side:
-
-        df = pd.read_csv("results.csv")
-        df_pre = df[df["mode"] == "presearch"]
-        df_llm = df[df["mode"] == "llm_only"]
-    """
+    """Run each query in each mode from *modes* with atomic per-query checkpointing."""
+    if modes is None:
+        modes = ["presearch", "semantic", "llm_only"]
     inventory = Inventory()
     inventory_summary = _build_inventory_summary(inventory)
-    extract_fn, generate_fn = _build_pipeline_callables(mock)
+    extract_fn, semantic_search_fn, generate_fn = _build_pipeline_callables(mock)
 
     results: list[dict] = []
     total = len(queries)
 
     for idx, item in enumerate(queries, start=1):
         if verbose:
-            print(f"\n  ── Query {idx}/{total} (both modes) ──")
+            print(f"\n  ── Query {idx}/{total} ({', '.join(modes)}) ──")
 
-        row_pre = _run_single_query(
-            item, idx, total, inventory, inventory_summary,
-            extract_fn, generate_fn, "presearch", verbose,
-        )
-        row_llm = _run_single_query(
-            item, idx, total, inventory, inventory_summary,
-            extract_fn, generate_fn, "llm_only", verbose,
-        )
+        rows_for_query = []
+        for mode in modes:
+            row = _run_single_query(
+                item, idx, total, inventory, inventory_summary,
+                extract_fn, semantic_search_fn, generate_fn, mode, verbose,
+            )
+            rows_for_query.append(row)
+            results.append(row)
 
-        results.append(row_pre)
-        results.append(row_llm)
-
-        # Checkpoint both rows atomically so we never write a partial pair
+        # Checkpoint all rows atomically so we never write a partial mode set
         if checkpoint_path:
-            _append_csv([row_pre, row_llm], checkpoint_path)
+            _append_csv(rows_for_query, checkpoint_path)
 
     return results
 
@@ -629,10 +686,10 @@ def _print_summary(summary: dict) -> None:
           f" / {summary['latency_p50_s']:.3f}s"
           f" / {summary['latency_max_s']:.3f}s")
 
-    # Per-mode comparison table (only shown in --mode both runs)
+    # Per-mode comparison table (shown when multiple modes are present)
     if summary.get("by_mode"):
         print()
-        print("  Mode comparison (presearch vs. llm_only):")
+        print("  Mode comparison:")
         m_header = f"  {'Mode':<12} {'Queries':>7} {'Success':>9} {'Hallucinated':>14} {'Latency mean':>14}"
         print(m_header)
         print("  " + "─" * 58)
@@ -691,7 +748,7 @@ def _save_summary(summary: dict, output_dir: str, timestamp: str) -> str:
     if summary.get("by_mode"):
         lines += [
             "",
-            "Mode comparison (presearch vs. llm_only):",
+            "Mode comparison:",
             f"  {'Mode':<12} {'Queries':>7} {'Success':>9} {'Hallucinated':>14} {'Latency mean':>14}",
             "  " + "─" * 58,
         ]
@@ -734,8 +791,9 @@ def _parse_args() -> argparse.Namespace:
             "Modes\n"
             "-----\n"
             "  presearch  Full pipeline: term extraction → inventory search → generation.\n"
+            "  semantic   Semantic retrieval over inventory embeddings → generation.\n"
             "  llm_only   No inventory pre-search; prompt includes full inventory context.\n"
-            "  both       Run every query in both modes and save two labelled rows each.\n\n"
+            "  all        Run every query in all three modes and save three labelled rows each.\n\n"
             "Resume support\n"
             "--------------\n"
             "  Rows are written to <output>/results.csv after each query.  Re-running\n"
@@ -754,12 +812,14 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--mode",
-        choices=["llm_only", "presearch", "both"],
+        choices=["llm_only", "presearch", "semantic", "all", "both"],
         default="presearch",
         help=(
             "Evaluation mode: 'presearch' (full pipeline, default), "
+            "'semantic' (embedding retrieval + generation), "
             "'llm_only' (no pre-search, but includes inventory context), or "
-            "'both' (compare both per query)"
+            "'all' (compare all three per query). "
+            "'both' is kept as a legacy alias for presearch + llm_only."
         ),
     )
     parser.add_argument(
@@ -813,8 +873,11 @@ def main() -> int:
         print(f"[Resume] --start_from override: starting at query index {start_idx}")
     else:
         existing_rows = _count_existing_results(resume_csv)
-        if args.mode == "both":
-            # Each query produces 2 rows (presearch + llm_only)
+        if args.mode == "all":
+            # Each query produces 3 rows (presearch + semantic + llm_only)
+            start_idx = existing_rows // 3
+        elif args.mode == "both":
+            # Legacy alias: each query produces 2 rows (presearch + llm_only)
             start_idx = existing_rows // 2
         else:
             start_idx = existing_rows
@@ -847,11 +910,20 @@ def main() -> int:
     print()
 
     # ── Run evaluation ────────────────────────────────────────────────────
-    if args.mode == "both":
-        results = _run_both_modes(
+    if args.mode == "all":
+        results = _run_comparison_modes(
             queries_to_run,
             mock=args.mock,
             verbose=not args.quiet,
+            modes=["presearch", "semantic", "llm_only"],
+            checkpoint_path=resume_csv,
+        )
+    elif args.mode == "both":
+        results = _run_comparison_modes(
+            queries_to_run,
+            mock=args.mock,
+            verbose=not args.quiet,
+            modes=["presearch", "llm_only"],
             checkpoint_path=resume_csv,
         )
     else:

@@ -1,5 +1,9 @@
 # Product Inventory System for Shop Assistant
 
+import math
+
+import requests
+
 SEARCH_RESULTS_PREFIX = "Search Results: "
 
 PRODUCTS = {
@@ -56,6 +60,7 @@ class Inventory:
     def __init__(self):
         self.products = PRODUCTS
         self.aisles = AISLE_LOCATIONS
+        self._semantic_embedding_cache = {}
 
     def find_product(self, product_name):
         """Find a product by name across all categories"""
@@ -117,6 +122,101 @@ class Inventory:
                         seen_ids.add(product["id"])
         return matched
 
+    def _format_match(self, product, aisle_num):
+        return (
+            f"{product['name']} (Aisle {aisle_num},"
+            f" ${product['price']:.2f}, {product['stock']} in stock)"
+        )
+
+    def _semantic_text_for_product(self, product, category):
+        return (
+            f"name: {product['name']}. id: {product['id']}. "
+            f"category: {category}. aisle: {self.aisles[category]}"
+        )
+
+    def _ollama_embed(self, text, model):
+        try:
+            response = requests.post(
+                "http://localhost:11434/api/embeddings",
+                json={"model": model, "prompt": text},
+                timeout=10,
+            )
+            data = response.json()
+            embedding = data.get("embedding")
+            if isinstance(embedding, list) and embedding:
+                return embedding
+        except Exception:
+            pass
+        return None
+
+    def _cosine_similarity(self, vec_a, vec_b):
+        if not vec_a or not vec_b or len(vec_a) != len(vec_b):
+            return 0.0
+        dot = sum(a * b for a, b in zip(vec_a, vec_b))
+        norm_a = math.sqrt(sum(a * a for a in vec_a))
+        norm_b = math.sqrt(sum(b * b for b in vec_b))
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+        return dot / (norm_a * norm_b)
+
+    def semantic_search(self, query, top_k=5, model="nomic-embed-text", min_score=0.15):
+        """Return top semantic matches from inventory for a free-form query."""
+        query = (query or "").strip()
+        if not query:
+            return []
+
+        query_embedding = self._ollama_embed(query, model)
+        if not query_embedding:
+            return []
+
+        scored = []
+        for category, products in self.products.items():
+            aisle_num = self.aisles[category]
+            for product in products:
+                if product["stock"] <= 0:
+                    continue
+
+                cache_key = (model, product["id"])
+                if cache_key not in self._semantic_embedding_cache:
+                    self._semantic_embedding_cache[cache_key] = self._ollama_embed(
+                        self._semantic_text_for_product(product, category),
+                        model,
+                    )
+                product_embedding = self._semantic_embedding_cache[cache_key]
+                if not product_embedding:
+                    continue
+
+                score = self._cosine_similarity(query_embedding, product_embedding)
+                if score >= min_score:
+                    scored.append(
+                        {
+                            "product": product,
+                            "category": category,
+                            "aisle": aisle_num,
+                            "score": score,
+                        }
+                    )
+
+        scored.sort(key=lambda item: item["score"], reverse=True)
+        return scored[:max(1, int(top_k))]
+
+    def semantic_search_inventory(self, query, top_k=5, model="nomic-embed-text", min_score=0.15):
+        """Search inventory semantically and format as a tool observation string."""
+        matches = self.semantic_search(
+            query=query,
+            top_k=top_k,
+            model=model,
+            min_score=min_score,
+        )
+        if not matches:
+            return SEARCH_RESULTS_PREFIX + f"{query}: not found in store inventory"
+
+        formatted_matches = [
+            self._format_match(item["product"], item["aisle"])
+            for item in matches
+        ]
+        return SEARCH_RESULTS_PREFIX + f"{query}: {', '.join(formatted_matches)}"
+
     def search_inventory(self, search_terms):
         """Search inventory for a list of search terms.
 
@@ -143,10 +243,7 @@ class Inventory:
                         or term_lower in product["id"].lower()
                     ):
                         if product["stock"] > 0:
-                            matches.append(
-                                f"{product['name']} (Aisle {aisle_num},"
-                                f" ${product['price']:.2f}, {product['stock']} in stock)"
-                            )
+                            matches.append(self._format_match(product, aisle_num))
                         else:
                             matches.append(f"{product['name']} (out of stock)")
             if matches:

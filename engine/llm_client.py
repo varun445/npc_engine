@@ -236,14 +236,16 @@ Instructions:
 - You help customers find products, answer general questions about the store, and direct them to the right aisles when asked.
 - If the customer asks what you can do or how you can help, explain that you can help them find products and add items to their cart.
 - If the inventory reference above is provided, use it as the source of truth for product availability and aisle numbers.
+- If you confidently identify an in-stock item from the inventory reference, you may set action to "move" and include the relevant aisle number(s) in target_aisles.
+- If no clear product match is available, set action to "none" and target_aisles to [].
 - Keep your response to 1-3 sentences.
 - Do NOT invent specific products or aisle numbers not present in the inventory reference.
 
 Reply with ONLY valid JSON in this exact format and nothing else:
 {{
   "dialogue": "<your response to the customer>",
-  "action": "none",
-  "target_aisles": []
+  "action": "<none or move>",
+  "target_aisles": [<aisle numbers as integers, or empty []>]
 }}
 """
     else:
