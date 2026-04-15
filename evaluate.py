@@ -128,6 +128,7 @@ from models.inventory import Inventory, AISLE_LOCATIONS
 # ---------------------------------------------------------------------------
 VALID_AISLES = set(AISLE_LOCATIONS.values())          # derived from AISLE_LOCATIONS
 AISLE_REFERENCE_RE = re.compile(r"[Aa]isle\s+(\d+)")  # matches "Aisle N" etc.
+AISLE_CLAUSE_RE = re.compile(r"(?i)\baisles?\b([^.;\n]*)")
 REQUIRED_JSON_KEYS = {"dialogue", "action", "target_aisles"}
 MAX_DIALOGUE_SNIPPET_LENGTH = 120
 ASSISTANT_NAME = "Alex"
@@ -296,7 +297,10 @@ def _find_hallucinated_aisles(response: dict) -> list[int]:
     invalid: list[int] = []
 
     # 1. Structured field
-    for aisle in response.get("target_aisles", []):
+    target_aisles = response.get("target_aisles", [])
+    if not isinstance(target_aisles, (list, tuple, set)):
+        target_aisles = [target_aisles]
+    for aisle in target_aisles:
         try:
             if int(aisle) not in VALID_AISLES:
                 invalid.append(int(aisle))
@@ -304,10 +308,19 @@ def _find_hallucinated_aisles(response: dict) -> list[int]:
             pass
 
     # 2. Inline dialogue mentions
-    for m in AISLE_REFERENCE_RE.finditer(response.get("dialogue", "")):
+    dialogue = response.get("dialogue", "")
+    for m in AISLE_REFERENCE_RE.finditer(dialogue):
         aisle_num = int(m.group(1))
         if aisle_num not in VALID_AISLES and aisle_num not in invalid:
             invalid.append(aisle_num)
+
+    # 3. Plural/compound aisle mentions, e.g. "Aisles 1 and 9"
+    for m in AISLE_CLAUSE_RE.finditer(dialogue):
+        clause = m.group(1) or ""
+        for num_str in re.findall(r"\d+", clause):
+            aisle_num = int(num_str)
+            if aisle_num not in VALID_AISLES and aisle_num not in invalid:
+                invalid.append(aisle_num)
 
     return invalid
 
@@ -316,7 +329,12 @@ def _find_hallucinated_aisles(response: dict) -> list[int]:
 # Task success helpers
 # ---------------------------------------------------------------------------
 
-def _is_task_success(response: dict, expected_items: list[str], inventory: Inventory) -> bool:
+def _is_task_success(
+    response: dict,
+    expected_items: list[str],
+    inventory: Inventory,
+    hallucinated_aisles: list[int] | None = None,
+) -> bool:
     """Determine whether the agent handled the query correctly.
 
     Rules:
@@ -326,6 +344,9 @@ def _is_task_success(response: dict, expected_items: list[str], inventory: Inven
     - If expected_items is empty (conversational / invalid query):
         The agent must have set action to "none".
     """
+    if hallucinated_aisles:
+        return False
+
     action = response.get("action", "none")
     target_aisles = response.get("target_aisles", [])
 
@@ -477,12 +498,17 @@ def _run_single_query(
         raw_response.keys()
     )
 
-    # ── Metric 2: Task Success ────────────────────────────────────────────
-    task_success = _is_task_success(raw_response, expected_items, inventory)
-
-    # ── Metric 3: Hallucination ───────────────────────────────────────────
+    # ── Metric 2: Hallucination ───────────────────────────────────────────
     hallucinated_aisles = _find_hallucinated_aisles(raw_response)
     hallucinated = len(hallucinated_aisles) > 0
+
+    # ── Metric 3: Task Success ────────────────────────────────────────────
+    task_success = _is_task_success(
+        raw_response,
+        expected_items,
+        inventory,
+        hallucinated_aisles=hallucinated_aisles,
+    )
 
     # ── Collect result ────────────────────────────────────────────────────
     result_row = {
