@@ -1,7 +1,7 @@
 import requests
 import json
 import re
-from models.inventory import SEARCH_RESULTS_PREFIX
+from models.inventory import SEARCH_RESULTS_PREFIX, Inventory
 
 # Set to True to print a structured workflow trace to the terminal.
 # Each LLM call logs the full prompt sent to Ollama and the raw text
@@ -160,11 +160,7 @@ def _format_search_observations(tool_observations, customer_query=""):
     found_lines = []
     not_found_names = []
     grounded_aisles = []
-    stopwords = {
-        "i", "me", "my", "we", "our", "you", "your", "the", "a", "an", "and", "or",
-        "to", "for", "of", "in", "on", "with", "some", "any", "something", "want",
-        "need", "find", "get", "give", "show", "where", "is", "are", "can", "please",
-    }
+    stopwords = set(getattr(Inventory, "_SEMANTIC_STOPWORDS", set()))
     query_tokens = {
         tok
         for tok in re.findall(r"[a-z0-9]+", (customer_query or "").lower())
