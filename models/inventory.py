@@ -209,22 +209,30 @@ class Inventory:
                 {"model": model, "input": text},
             ]
 
+        def _is_numeric_vector(value):
+            return (
+                isinstance(value, list)
+                and len(value) > 0
+                and all(isinstance(x, (int, float)) for x in value)
+            )
+
         def _extract_embedding(data):
             embedding = data.get("embedding")
-            if isinstance(embedding, list) and embedding and isinstance(embedding[0], (int, float)):
+            if _is_numeric_vector(embedding):
                 return embedding
 
             embeddings = data.get("embeddings")
             if isinstance(embeddings, list) and embeddings:
                 if isinstance(embeddings[0], list):
-                    return embeddings[0]
-                if isinstance(embeddings[0], (int, float)):
+                    if _is_numeric_vector(embeddings[0]):
+                        return embeddings[0]
+                if _is_numeric_vector(embeddings):
                     return embeddings
 
             rows = data.get("data")
             if isinstance(rows, list) and rows and isinstance(rows[0], dict):
                 emb = rows[0].get("embedding")
-                if isinstance(emb, list) and emb:
+                if _is_numeric_vector(emb):
                     return emb
             return None
 
