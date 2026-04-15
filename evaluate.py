@@ -128,6 +128,7 @@ from models.inventory import Inventory, AISLE_LOCATIONS
 # ---------------------------------------------------------------------------
 VALID_AISLES = set(AISLE_LOCATIONS.values())          # derived from AISLE_LOCATIONS
 AISLE_REFERENCE_RE = re.compile(r"[Aa]isle\s+(\d+)")  # matches "Aisle N" etc.
+# Captures text after "aisle"/"aisles" so we can extract all referenced numbers.
 AISLE_CLAUSE_RE = re.compile(r"(?i)\baisles?\b([^.;\n]*)")
 REQUIRED_JSON_KEYS = {"dialogue", "action", "target_aisles"}
 MAX_DIALOGUE_SNIPPET_LENGTH = 120
@@ -298,8 +299,15 @@ def _find_hallucinated_aisles(response: dict) -> list[int]:
 
     # 1. Structured field
     target_aisles = response.get("target_aisles", [])
-    if not isinstance(target_aisles, (list, tuple, set)):
+    if target_aisles is None:
+        target_aisles = []
+    elif isinstance(target_aisles, (str, bytes, int, float)):
         target_aisles = [target_aisles]
+    elif not isinstance(target_aisles, (list, tuple, set)):
+        try:
+            target_aisles = list(target_aisles)
+        except TypeError:
+            target_aisles = [target_aisles]
     for aisle in target_aisles:
         try:
             if int(aisle) not in VALID_AISLES:
