@@ -1,0 +1,3 @@
+id,mode,query_type,query,expected_items,product_terms_extracted,action,target_aisles,dialogue_snippet,json_adherent,task_success,hallucinated,hallucinated_aisles,latency_s
+1,presearch,direct,Where can I find milk?,milk,milk,move,[1],I'm adding Milk (1L) to your cart — you'll find it in Aisle 1! I'm adding Milk (2L) to your cart — you'll find it in Ais,True,True,False,[],60.974
+1,llm_only,direct,Where can I find milk?,milk,,move,[1],Hi there! You can find our milk in Aisle 1. We have both 1L and 2L options available in the dairy section.,True,True,False,[],73.073
