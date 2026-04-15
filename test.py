@@ -29,7 +29,7 @@ def main() -> int:
     inventory = Inventory()
 
     print(f"[1/3] Checking embedding model '{args.model}'...")
-    probe = inventory._ollama_embed("embedding probe", args.model)
+    probe = inventory.probe_embedding_model(model=args.model)
     if not probe:
         print(
             "❌ Embedding model check failed. Ensure Ollama is running and model is available "

@@ -59,6 +59,14 @@ AISLE_LOCATIONS = {
 }
 
 class Inventory:
+    _SEMANTIC_STOPWORDS = {
+        "i", "me", "my", "we", "our", "you", "your", "the", "a", "an", "and", "or",
+        "to", "for", "of", "in", "on", "with", "some", "any", "something", "want",
+        "need", "find", "get", "give", "show", "where", "is", "are", "can", "please",
+    }
+    _MAX_SCORE_WEIGHT = 0.65
+    _AVG_SCORE_WEIGHT = 0.35
+
     def __init__(self):
         self.products = PRODUCTS
         self.aisles = AISLE_LOCATIONS
@@ -151,12 +159,6 @@ class Inventory:
         if not query_lower:
             return []
 
-        stopwords = {
-            "i", "me", "my", "we", "our", "you", "your", "the", "a", "an", "and", "or",
-            "to", "for", "of", "in", "on", "with", "some", "any", "something", "want",
-            "need", "find", "get", "give", "show", "where", "is", "are", "can", "please",
-        }
-
         terms = []
 
         # Keep full product phrases if directly present in the query.
@@ -173,7 +175,7 @@ class Inventory:
 
         tokens = re.findall(r"[a-z0-9]+", query_lower)
         for token in tokens:
-            if len(token) <= 2 or token in stopwords:
+            if len(token) <= 2 or token in self._SEMANTIC_STOPWORDS:
                 continue
             terms.append(token)
 
@@ -207,6 +209,10 @@ class Inventory:
             except (requests.RequestException, ValueError, TypeError):
                 continue
         return None
+
+    def probe_embedding_model(self, model="nomic-embed-text", text="embedding probe"):
+        """Return one embedding vector for a probe text, or None if unavailable."""
+        return self._ollama_embed(text, model)
 
     def _cosine_similarity(self, vec_a, vec_b):
         if not vec_a or not vec_b or len(vec_a) != len(vec_b):
@@ -299,7 +305,7 @@ class Inventory:
             avg_score = sum(per_term_scores) / len(per_term_scores)
             # Blend peak term hit and overall term alignment so exact product words
             # score strongly while still rewarding multi-term query consistency.
-            score = (0.65 * max_score) + (0.35 * avg_score)
+            score = (self._MAX_SCORE_WEIGHT * max_score) + (self._AVG_SCORE_WEIGHT * avg_score)
             if score >= min_score:
                 scored.append(
                     {
