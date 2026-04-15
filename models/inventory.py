@@ -237,11 +237,13 @@ class Inventory:
                     continue
                 cache_key = (model, product["id"])
                 if cache_key not in self._semantic_embedding_cache:
-                    self._semantic_embedding_cache[cache_key] = self._ollama_embed(
+                    embedded = self._ollama_embed(
                         self._semantic_text_for_product(product, category),
                         model,
                     )
-                embedding = self._semantic_embedding_cache[cache_key]
+                    if embedded:
+                        self._semantic_embedding_cache[cache_key] = embedded
+                embedding = self._semantic_embedding_cache.get(cache_key)
                 if not embedding:
                     continue
                 vector_rows.append(
@@ -301,6 +303,8 @@ class Inventory:
                 self._cosine_similarity(query_vec, row["embedding"])
                 for query_vec in query_embeddings
             ]
+            if not per_term_scores:
+                continue
             max_score = max(per_term_scores)
             avg_score = sum(per_term_scores) / len(per_term_scores)
             # Blend peak term hit and overall term alignment so exact product words
