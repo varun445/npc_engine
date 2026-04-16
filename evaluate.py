@@ -504,8 +504,8 @@ def _run_single_query(
 
     # ── Write query header to structured log ─────────────────────────────
     try:
-        from engine import llm_client as _llm_mod
-        _llm_mod._write_log(
+        from engine.llm_client import log_step
+        log_step(
             f"\n{'═'*72}\n"
             f"QUERY [{idx}/{total}] id={qid}  mode={mode}  type={query_type}\n"
             f"  query : {query}\n"
@@ -540,8 +540,8 @@ def _run_single_query(
         tool_observations = [observation]
         # Log intermediate semantic search result
         try:
-            from engine import llm_client as _llm_mod
-            _llm_mod._write_log(
+            from engine.llm_client import log_step
+            log_step(
                 f"[SEMANTIC TERMS] extracted={product_terms}\n"
                 f"[SEMANTIC OBS  ] {observation}\n"
             )

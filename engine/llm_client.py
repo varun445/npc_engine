@@ -25,7 +25,7 @@ _log_file_path: str | None = None
 _log_lock = threading.Lock()
 
 
-def setup_log_file(path: str) -> None:
+def setup_log_file(path: str | None) -> None:
     """Configure the path for the structured run log.
 
     Creates (or truncates) the file and writes a header line.  All subsequent
@@ -36,14 +36,17 @@ def setup_log_file(path: str) -> None:
     queries.  Pass ``None`` to disable file logging.
 
     Args:
-        path: Absolute or relative path to the ``.txt`` log file.
+        path: Absolute or relative path to the ``.txt`` log file, or ``None``
+              to disable file logging.
     """
     global _log_file_path
     _log_file_path = path
     if path is None:
         return
     import os
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    log_dir = os.path.dirname(os.path.abspath(path))
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         f.write(f"NPC Engine — Structured Run Log\n")
         f.write(f"Generated : {datetime.now().isoformat()}\n")
@@ -57,6 +60,20 @@ def _write_log(text: str) -> None:
     with _log_lock:
         with open(_log_file_path, "a", encoding="utf-8") as f:
             f.write(text)
+
+
+def log_step(text: str) -> None:
+    """Write an intermediate pipeline step to the structured log file.
+
+    Unlike :func:`_log`, this function does not print to stdout and is
+    intended for callers outside this module (e.g. ``evaluate.py``) that
+    need to record intermediate steps such as extracted terms or search
+    observations without coupling to internal DEBUG output.
+
+    Args:
+        text: Free-form text to append to the log file.
+    """
+    _write_log(text)
 
 
 def _log(msg):
