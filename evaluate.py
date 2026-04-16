@@ -959,10 +959,12 @@ def plot_mode_comparison(
         return None
 
     selected_modes = []
+    seen_canonical_modes = set()
     for mode in modes:
         canonical = _canonical_mode_for_plot(mode, available_modes)
-        if canonical in available_modes and (mode, canonical) not in selected_modes:
+        if canonical in available_modes and canonical not in seen_canonical_modes:
             selected_modes.append((mode, canonical))
+            seen_canonical_modes.add(canonical)
 
     if not selected_modes:
         return None
