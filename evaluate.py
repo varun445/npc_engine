@@ -306,50 +306,83 @@ def _mock_semantic_search(
 # Hallucination detection helpers
 # ---------------------------------------------------------------------------
 
-def _find_hallucinated_aisles(response: dict) -> list[int]:
+def _normalize_aisle_values(value) -> list[int]:
+    """Normalize aisle payloads into a list of integer aisle IDs."""
+    if value is None:
+        values = []
+    elif isinstance(value, (str, bytes, int, float)):
+        values = [value]
+    elif isinstance(value, (list, tuple, set)):
+        values = list(value)
+    else:
+        try:
+            values = list(value)
+        except TypeError:
+            values = [value]
+
+    normalized = []
+    for aisle in values:
+        try:
+            normalized.append(int(aisle))
+        except (TypeError, ValueError):
+            continue
+    return normalized
+
+
+def _expected_stocked_aisles(expected_items: list[str], inventory: Inventory) -> set[int]:
+    """Return aisles of in-stock products matched by expected query terms."""
+    if not expected_items:
+        return set()
+
+    aisles = set()
+    for term in expected_items:
+        for product in inventory.find_products_by_terms([term]):
+            category = product.get("category")
+            if not category:
+                continue
+            aisle_num = inventory.aisles.get(category)
+            if aisle_num is not None:
+                aisles.add(int(aisle_num))
+    return aisles
+
+
+def _find_hallucinated_aisles(response: dict, expected_aisles: set[int] | None = None) -> list[int]:
     """Return a list of aisle numbers referenced that are not valid store aisles,
-    or that were claimed by the LLM but removed by the grounding filter.
+    that do not map to expected in-stock aisles, or that were claimed by the
+    LLM but removed by the grounding filter.
 
     Checks:
     1. ``target_aisles`` (structured field, after grounding)
-    2. ``_raw_target_aisles`` (LLM-claimed aisles *before* grounding) — aisles
+    2. Mismatch against ``expected_aisles`` when provided.
+    3. ``_raw_target_aisles`` (LLM-claimed aisles *before* grounding) — aisles
        that were removed by grounding indicate the model hallucinated navigation
        targets not backed by any search result.
-    3. Any "Aisle N" mentions inside the ``dialogue`` string.
+    4. Any "Aisle N" mentions inside the ``dialogue`` string.
     """
     invalid: list[int] = []
 
     # 1. Structured field (post-grounding)
-    target_aisles = response.get("target_aisles", [])
-    if target_aisles is None:
-        target_aisles = []
-    elif isinstance(target_aisles, (str, bytes, int, float)):
-        target_aisles = [target_aisles]
-    elif not isinstance(target_aisles, (list, tuple, set)):
-        try:
-            target_aisles = list(target_aisles)
-        except TypeError:
-            target_aisles = [target_aisles]
-    for aisle in target_aisles:
-        try:
-            if int(aisle) not in VALID_AISLES:
-                invalid.append(int(aisle))
-        except (TypeError, ValueError):
-            pass
+    target_aisles = _normalize_aisle_values(response.get("target_aisles", []))
+    for aisle_int in target_aisles:
+        if aisle_int not in VALID_AISLES:
+            invalid.append(aisle_int)
+
+    # If this query has known expected aisle(s), any target aisle outside that
+    # set is an aisle hallucination (e.g., milk reported in aisle 4 instead of 1).
+    if expected_aisles:
+        for aisle_int in target_aisles:
+            if aisle_int not in expected_aisles and aisle_int not in invalid:
+                invalid.append(aisle_int)
 
     # 2. Raw aisles claimed by the LLM before the grounding filter was applied.
     #    Any aisle present in _raw_target_aisles but NOT in the post-grounding
     #    target_aisles was removed because it had no inventory backing — i.e.
     #    the model hallucinated it.
-    grounded_set = {int(a) for a in target_aisles if str(a).lstrip("-").isdigit()}
+    grounded_set = set(target_aisles)
     raw_aisles = response.get("_raw_target_aisles", [])
     if raw_aisles is None:
         raw_aisles = []
-    for aisle in raw_aisles:
-        try:
-            aisle_int = int(aisle)
-        except (TypeError, ValueError):
-            continue
+    for aisle_int in _normalize_aisle_values(raw_aisles):
         if aisle_int not in grounded_set and aisle_int not in invalid:
             # This aisle was claimed by the LLM but removed by grounding
             # (i.e. not backed by any found inventory item).
@@ -368,6 +401,8 @@ def _find_hallucinated_aisles(response: dict) -> list[int]:
         for num_str in re.findall(r"\d+", clause):
             aisle_num = int(num_str)
             if aisle_num not in VALID_AISLES and aisle_num not in invalid:
+                invalid.append(aisle_num)
+            elif expected_aisles and aisle_num not in expected_aisles and aisle_num not in invalid:
                 invalid.append(aisle_num)
 
     return invalid
@@ -584,7 +619,11 @@ def _run_single_query(
     )
 
     # ── Metric 2: Hallucination ───────────────────────────────────────────
-    hallucinated_aisles = _find_hallucinated_aisles(raw_response)
+    expected_aisles = _expected_stocked_aisles(expected_items, inventory)
+    hallucinated_aisles = _find_hallucinated_aisles(
+        raw_response,
+        expected_aisles=expected_aisles,
+    )
     hallucinated = len(hallucinated_aisles) > 0
 
     # ── Metric 3: Task Success ────────────────────────────────────────────
