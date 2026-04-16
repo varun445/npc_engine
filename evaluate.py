@@ -1008,7 +1008,9 @@ def plot_mode_comparison(
     except ImportError:
         return None
 
-    os.makedirs(os.path.dirname(output_image_path), exist_ok=True)
+    output_dir = os.path.dirname(output_image_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
     x = list(range(len(labels)))
     width = 0.2
 

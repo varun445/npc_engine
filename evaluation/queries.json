@@ -418,13 +418,13 @@
   },
   {
     "id": 46,
-    "query": "I need bicycle tires.",
+    "query": "Do you carry sushi nori sheets?",
     "query_type": "not_in_store",
     "expected_items": []
   },
   {
     "id": 47,
-    "query": "Do you have motor oil?",
+    "query": "Can I buy infant diapers here?",
     "query_type": "not_in_store",
     "expected_items": []
   },
