@@ -83,6 +83,24 @@ def _log(msg):
     _write_log(f"[LOG] {msg}\n")
 
 
+def _strip_reasoning_sections(text: str) -> str:
+    """Remove model reasoning blocks (e.g. <think>...</think>) from text."""
+    stripped = re.sub(
+        r"<\s*(?:think|thinking)\b[^>]*>[\s\S]*?<\s*/\s*(?:think|thinking)\s*>",
+        " ",
+        text,
+        flags=re.IGNORECASE,
+    )
+    # Handle malformed/unclosed tags by dropping everything after opening tag.
+    stripped = re.sub(
+        r"<\s*(?:think|thinking)\b[^>]*>[\s\S]*$",
+        " ",
+        stripped,
+        flags=re.IGNORECASE,
+    )
+    return stripped.strip()
+
+
 def _parse_json_flexible(text):
     """Parse JSON from LLM text.
 
@@ -95,14 +113,19 @@ def _parse_json_flexible(text):
     if not isinstance(text, str):
         return None
 
+    # Ignore hidden reasoning sections so parsing only sees final answer text.
+    parse_text = _strip_reasoning_sections(text)
+    if not parse_text:
+        return None
+
     # 1) Fast path: strict JSON payload.
     try:
-        return json.loads(text)
+        return json.loads(parse_text)
     except json.JSONDecodeError:
         pass
 
     # 2) Common LLM format: ```json ... ```
-    fenced_blocks = re.findall(r"```(?:json)?\s*([\s\S]*?)\s*```", text, flags=re.IGNORECASE)
+    fenced_blocks = re.findall(r"```(?:json)?\s*([\s\S]*?)\s*```", parse_text, flags=re.IGNORECASE)
     for block in fenced_blocks:
         try:
             return json.loads(block.strip())
@@ -111,11 +134,11 @@ def _parse_json_flexible(text):
 
     # 3) Fallback: locate first decodable JSON object/array inside mixed text.
     decoder = json.JSONDecoder()
-    for i, ch in enumerate(text):
+    for i, ch in enumerate(parse_text):
         if ch not in "{[":
             continue
         try:
-            parsed, _ = decoder.raw_decode(text[i:])
+            parsed, _ = decoder.raw_decode(parse_text[i:])
             return parsed
         except json.JSONDecodeError:
             continue
@@ -124,9 +147,9 @@ def _parse_json_flexible(text):
     #    Handles responses where the JSON structure is valid but surrounded by
     #    prose that confuses the decoder (e.g. trailing notes after the closing }).
     try:
-        d_match = re.search(r'"dialogue"\s*:\s*"((?:[^"\\]|\\.)*)"', text)
-        a_match = re.search(r'"action"\s*:\s*"([^"]*)"', text)
-        t_match = re.search(r'"target_aisles"\s*:\s*(\[[^\]]*\])', text)
+        d_match = re.search(r'"dialogue"\s*:\s*"((?:[^"\\]|\\.)*)"', parse_text)
+        a_match = re.search(r'"action"\s*:\s*"([^"]*)"', parse_text)
+        t_match = re.search(r'"target_aisles"\s*:\s*(\[[^\]]*\])', parse_text)
         if d_match and a_match and t_match:
             return {
                 "dialogue": d_match.group(1),
