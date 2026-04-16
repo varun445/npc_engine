@@ -349,9 +349,14 @@ class Inventory:
         if top_k <= 0:
             return []
 
-        terms_to_embed = query_terms if query_terms else self.extract_semantic_query_terms(query)
+        terms_to_embed = list(query_terms) if query_terms else self.extract_semantic_query_terms(query)
         if not terms_to_embed:
             terms_to_embed = [query]
+        # Always include the full raw query as an additional embedding so that
+        # associative/vague queries (e.g. "I want something healthy") are
+        # captured by their full sentence semantics, not just individual tokens.
+        if query and query not in terms_to_embed:
+            terms_to_embed = [query] + terms_to_embed
 
         query_embeddings = []
         for term in terms_to_embed:

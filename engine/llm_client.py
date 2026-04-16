@@ -1,6 +1,8 @@
 import requests
 import json
 import re
+import threading
+from datetime import datetime
 from models.inventory import SEARCH_RESULTS_PREFIX, Inventory
 
 # Set to True to print a structured workflow trace to the terminal.
@@ -14,11 +16,54 @@ MIN_SCORE_WITH_QUERY_OVERLAP = 0.22
 MIN_SCORE_NO_OVERLAP = 0.55
 HIGH_CONFIDENCE_FALLBACK_SCORE = 0.80
 
+# ---------------------------------------------------------------------------
+# Structured log file (optional — configured via setup_log_file).
+# Thread-safe write via a lock so concurrent evaluation workers don't
+# interleave entries.
+# ---------------------------------------------------------------------------
+_log_file_path: str | None = None
+_log_lock = threading.Lock()
+
+
+def setup_log_file(path: str) -> None:
+    """Configure the path for the structured run log.
+
+    Creates (or truncates) the file and writes a header line.  All subsequent
+    calls to :func:`_log` and :func:`query_llm` will append to this file in
+    addition to printing to stdout (when DEBUG is True).
+
+    Call this once at startup (e.g. from ``evaluate.py``) before running any
+    queries.  Pass ``None`` to disable file logging.
+
+    Args:
+        path: Absolute or relative path to the ``.txt`` log file.
+    """
+    global _log_file_path
+    _log_file_path = path
+    if path is None:
+        return
+    import os
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(f"NPC Engine — Structured Run Log\n")
+        f.write(f"Generated : {datetime.now().isoformat()}\n")
+        f.write("=" * 72 + "\n\n")
+
+
+def _write_log(text: str) -> None:
+    """Append *text* to the active log file (thread-safe, no-op if unset)."""
+    if not _log_file_path:
+        return
+    with _log_lock:
+        with open(_log_file_path, "a", encoding="utf-8") as f:
+            f.write(text)
+
 
 def _log(msg):
-    """Print a debug line to stdout only when DEBUG is enabled."""
+    """Print a debug line to stdout when DEBUG is enabled, and to the log file."""
     if DEBUG:
         print(f"[DEBUG] {msg}")
+    _write_log(f"[LOG] {msg}\n")
 
 
 def _parse_json_flexible(text):
@@ -58,16 +103,41 @@ def _parse_json_flexible(text):
         except json.JSONDecodeError:
             continue
 
+    # 4) Last resort: extract the three required fields individually via regex.
+    #    Handles responses where the JSON structure is valid but surrounded by
+    #    prose that confuses the decoder (e.g. trailing notes after the closing }).
+    try:
+        d_match = re.search(r'"dialogue"\s*:\s*"((?:[^"\\]|\\.)*)"', text)
+        a_match = re.search(r'"action"\s*:\s*"([^"]*)"', text)
+        t_match = re.search(r'"target_aisles"\s*:\s*(\[[^\]]*\])', text)
+        if d_match and a_match and t_match:
+            return {
+                "dialogue": d_match.group(1),
+                "action": a_match.group(1),
+                "target_aisles": json.loads(t_match.group(1)),
+            }
+    except (json.JSONDecodeError, AttributeError):
+        pass
+
     return None
 
 
 def query_llm(prompt):
     """Send a prompt to the local Ollama/Mistral model and return the text response."""
+    timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
     if DEBUG:
         print(f"[DEBUG] ┌─ PROMPT ───────────────────────────────────────────────────────")
         for line in prompt.splitlines():
             print(f"[DEBUG] │ {line}")
         print(f"[DEBUG] └────────────────────────────────────────────────────────────────")
+    # Write the full prompt to the structured log file.
+    _write_log(
+        f"\n{'─'*72}\n"
+        f"[{timestamp}] PROMPT\n"
+        f"{'─'*72}\n"
+        + prompt
+        + "\n"
+    )
     try:
         response = requests.post(
             "http://localhost:11434/api/generate",
@@ -78,14 +148,25 @@ def query_llm(prompt):
             },
         )
         text = response.json()["response"]
+        resp_timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         if DEBUG:
             print(f"[DEBUG] ┌─ RESPONSE ─────────────────────────────────────────────────")
             for line in text.splitlines():
                 print(f"[DEBUG] │ {line}")
             print(f"[DEBUG] └────────────────────────────────────────────────────────────")
+        # Write the raw LLM response to the structured log file.
+        _write_log(
+            f"\n[{resp_timestamp}] LLM RESPONSE\n"
+            f"{'─'*72}\n"
+            + text
+            + "\n"
+        )
         return text
     except Exception as e:
-        return f"[LLM Error: {e}]"
+        err_msg = f"[LLM Error: {e}]"
+        _write_log(f"\n[ERROR] {err_msg}\n")
+        return err_msg
+
 
 
 def extract_product_terms(customer_query):
@@ -265,6 +346,13 @@ def generate_shop_assistant_response(
 
     Returns a dict with keys: ``dialogue``, ``action``, ``target_aisles``.
     """
+    # Log the incoming search observations so they appear in the structured log.
+    if tool_observations:
+        _write_log(
+            f"\n[SEARCH RESULTS] retrieval_mode={retrieval_mode}\n"
+            + "\n".join(f"  {obs}" for obs in tool_observations)
+            + "\n"
+        )
     memory_text = ""
     if memory:
         memory_text = "Previous conversation:\n"
@@ -323,6 +411,10 @@ Reply with ONLY valid JSON in this exact format and nothing else:
             search_section += "\n*** ITEMS WE CARRY (respond ONLY with items that appear here, with exact aisle numbers) ***\n"
             for line in found_lines:
                 search_section += f"  FOUND: {line}\n"
+        else:
+            # Explicitly state that no inventory matches were found so the LLM
+            # does not invent products or aisle numbers.
+            search_section += "\n*** INVENTORY SEARCH RETURNED NO RESULTS — no matching products were found for the customer's request. ***\n"
 
         if not_found_names:
             search_section += "\n*** ITEMS NOT IN STOCK (tell the customer we do not carry these) ***\n"
@@ -335,7 +427,7 @@ Reply with ONLY valid JSON in this exact format and nothing else:
 - SEMANTIC MODE: Treat FOUND items as the only grounded candidates from similarity retrieval.
 - If the customer asked for a recipe/dish, treat FOUND items as matched ingredients and mention only those ingredients.
 - If the customer asked an associative preference (e.g. healthy, light, high-protein), treat FOUND items as recommendations for that preference.
-- If the FOUND section is empty, clearly say you could not match the requested products/preference in inventory and ask for a more specific product name.
+- If the FOUND section is empty (no matching products were found in inventory), you MUST say that you could not find a match and ask for a more specific product name. NEVER invent or guess products or aisle numbers when the search returned no results.
 """
 
         prompt = f"""{preamble}
@@ -350,13 +442,14 @@ Instructions:
 - For every item in the NOT FOUND section: tell the customer we do not carry it.
 - If found items are in different aisles, list only those FOUND-item aisle numbers in target_aisles.
 - Keep your response to 1-2 sentences.
+- Do NOT invent, assume, or guess any product names or aisle numbers not listed in the FOUND section above.
 {semantic_instructions}
 
 ACTION RULES (follow exactly):
 - If the FOUND section above contains any items → set action to "move" and list every
    found item's aisle number in target_aisles.
-- If the FOUND section is empty (all items not found, or no search was done) → set
-  action to "none" and target_aisles to [].
+- If the FOUND section is empty or shows "NO RESULTS" → set action to "none" and
+  target_aisles to []. NEVER invent aisle numbers.
 - NEVER set action to "none" when there are found items with aisle numbers.
 
 Reply with ONLY valid JSON in this exact format and nothing else:
@@ -388,6 +481,13 @@ Reply with ONLY valid JSON in this exact format and nothing else:
                 result["target_aisles"] = [int(result["target_aisles"])]
             except (TypeError, ValueError):
                 result["target_aisles"] = []
+
+        # Capture the raw aisles claimed by the LLM *before* grounding.
+        # These are preserved in the result so that the evaluation layer can
+        # detect when the model hallucinated aisle numbers that were not backed
+        # by any search result.
+        raw_aisles_before_grounding = list(result["target_aisles"])
+
         # Ground aisles to inventory-backed FOUND lines only.
         if tool_observations:
             grounded_found_lines, _, grounded_aisles = _format_search_observations(
@@ -416,12 +516,17 @@ Reply with ONLY valid JSON in this exact format and nothing else:
         # fires there — it is only relevant for the product-search path.)
         if result["target_aisles"] and result.get("action") != "move":
             result["action"] = "move"
-        _log(f"  assistant result → action={result['action']} | aisles={result['target_aisles']} | \"{result.get('dialogue', '')[:80]}\"")
+
+        # Store the original LLM-claimed aisles (pre-grounding) so the
+        # evaluation layer can identify cases where the model hallucinated
+        # aisles that were removed by grounding.
+        result["_raw_target_aisles"] = raw_aisles_before_grounding
+
+        _log(f"  assistant result → action={result['action']} | aisles={result['target_aisles']} | raw_aisles={raw_aisles_before_grounding} | \"{result.get('dialogue', '')[:80]}\"")
         return result
     except (json.JSONDecodeError, TypeError):
         _log(f"  assistant result → JSON parse failed; raw={response[:80]}")
-        return {"dialogue": response, "action": "none", "target_aisles": []}
-
+        return {"dialogue": response, "action": "none", "target_aisles": [], "_raw_target_aisles": []}
 
 
 def generate_cashier_response(cashier_name, customer_query, cart_items, memory):

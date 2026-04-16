@@ -304,14 +304,19 @@ def _mock_semantic_search(
 # ---------------------------------------------------------------------------
 
 def _find_hallucinated_aisles(response: dict) -> list[int]:
-    """Return a list of aisle numbers referenced that are not valid store aisles.
+    """Return a list of aisle numbers referenced that are not valid store aisles,
+    or that were claimed by the LLM but removed by the grounding filter.
 
-    Checks both ``target_aisles`` (structured field) and any "Aisle N"
-    mentions inside the ``dialogue`` string.
+    Checks:
+    1. ``target_aisles`` (structured field, after grounding)
+    2. ``_raw_target_aisles`` (LLM-claimed aisles *before* grounding) — aisles
+       that were removed by grounding indicate the model hallucinated navigation
+       targets not backed by any search result.
+    3. Any "Aisle N" mentions inside the ``dialogue`` string.
     """
     invalid: list[int] = []
 
-    # 1. Structured field
+    # 1. Structured field (post-grounding)
     target_aisles = response.get("target_aisles", [])
     if target_aisles is None:
         target_aisles = []
@@ -329,14 +334,32 @@ def _find_hallucinated_aisles(response: dict) -> list[int]:
         except (TypeError, ValueError):
             pass
 
-    # 2. Inline dialogue mentions
+    # 2. Raw aisles claimed by the LLM before the grounding filter was applied.
+    #    Any aisle present in _raw_target_aisles but NOT in the post-grounding
+    #    target_aisles was removed because it had no inventory backing — i.e.
+    #    the model hallucinated it.
+    grounded_set = {int(a) for a in target_aisles if str(a).lstrip("-").isdigit()}
+    raw_aisles = response.get("_raw_target_aisles", [])
+    if raw_aisles is None:
+        raw_aisles = []
+    for aisle in raw_aisles:
+        try:
+            aisle_int = int(aisle)
+        except (TypeError, ValueError):
+            continue
+        if aisle_int not in grounded_set and aisle_int not in invalid:
+            # This aisle was claimed by the LLM but removed by grounding
+            # (i.e. not backed by any found inventory item).
+            invalid.append(aisle_int)
+
+    # 3. Inline dialogue mentions — check for invalid store aisles
     dialogue = response.get("dialogue", "")
     for m in AISLE_REFERENCE_RE.finditer(dialogue):
         aisle_num = int(m.group(1))
         if aisle_num not in VALID_AISLES and aisle_num not in invalid:
             invalid.append(aisle_num)
 
-    # 3. Plural/compound aisle mentions, e.g. "Aisles 1 and 9"
+    # 4. Plural/compound aisle mentions, e.g. "Aisles 1 and 9"
     for m in AISLE_CLAUSE_RE.finditer(dialogue):
         clause = m.group(1) or ""
         for num_str in re.findall(r"\d+", clause):
@@ -479,6 +502,18 @@ def _run_single_query(
             f" [{mode:9s}]: {query[:60]!r}"
         )
 
+    # ── Write query header to structured log ─────────────────────────────
+    try:
+        from engine import llm_client as _llm_mod
+        _llm_mod._write_log(
+            f"\n{'═'*72}\n"
+            f"QUERY [{idx}/{total}] id={qid}  mode={mode}  type={query_type}\n"
+            f"  query : {query}\n"
+            f"{'═'*72}\n"
+        )
+    except Exception:
+        pass
+
     # ── Pipeline timing start ─────────────────────────────────────────────
     t_start = time.perf_counter()
 
@@ -503,6 +538,15 @@ def _run_single_query(
             product_terms = inventory.extract_semantic_query_terms(query)
         observation = semantic_search_fn(query, inventory, top_k=5, query_terms=product_terms)
         tool_observations = [observation]
+        # Log intermediate semantic search result
+        try:
+            from engine import llm_client as _llm_mod
+            _llm_mod._write_log(
+                f"[SEMANTIC TERMS] extracted={product_terms}\n"
+                f"[SEMANTIC OBS  ] {observation}\n"
+            )
+        except Exception:
+            pass
     else:
         # llm_only — skip extraction and pre-search; send the query directly
         product_terms = []
@@ -929,6 +973,16 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Suppress per-query progress output",
     )
+    parser.add_argument(
+        "--log_file",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Path for the structured run log (.txt).  "
+            "Defaults to <output>/run_<timestamp>.log when not specified.  "
+            "Pass 'none' to disable file logging entirely."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -976,6 +1030,27 @@ def main() -> int:
 
     queries_to_run = queries[start_idx:]
 
+    # ── Set up structured run log ─────────────────────────────────────────
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if getattr(args, "log_file", None) and args.log_file.lower() == "none":
+        log_path = None
+    else:
+        log_path = getattr(args, "log_file", None) or os.path.join(
+            args.output, f"run_{timestamp}.log"
+        )
+    if not args.mock:
+        # Only set up file logging when using a live LLM; skip for mock runs
+        # so CI output stays clean (mock runs produce no interesting LLM text).
+        try:
+            from engine.llm_client import setup_log_file
+            setup_log_file(log_path)
+            if log_path:
+                print(f"Log file : {log_path}")
+        except ImportError:
+            pass
+    else:
+        log_path = None
+
     # ── Print run header ──────────────────────────────────────────────────
     llm_label = "MOCK (no Ollama)" if args.mock else "LIVE (Ollama/Mistral)"
     if args.mode == "both":
@@ -1022,12 +1097,14 @@ def main() -> int:
     _print_summary(summary)
 
     # ── Persist timestamped snapshot of this run ──────────────────────────
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     csv_path = _save_csv(results, args.output, timestamp)
     summary_path = _save_summary(summary, args.output, timestamp)
     print(f"\n  Results CSV  → {csv_path}")
     print(f"  Rolling CSV  → {resume_csv}")
-    print(f"  Summary file → {summary_path}\n")
+    print(f"  Summary file → {summary_path}")
+    if log_path:
+        print(f"  Run log      → {log_path}")
+    print()
 
     return 0
 

@@ -60,3 +60,193 @@ id,mode,query_type,query,expected_items,product_terms_extracted,action,target_ai
 1,semantic,direct,Where can I find milk?,milk,milk,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
 2,semantic,direct,Do you have cheddar cheese?,cheese,cheddar cheese; cheese,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
 3,semantic,direct,I need some apples please,apple,apple,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+1,presearch,direct,Where can I find milk?,milk,,none,[],How can I help you?,True,False,False,[],0.0
+2,presearch,direct,Do you have cheddar cheese?,cheese,cheddar cheese; cheese,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
+3,presearch,direct,I need some apples please,apple,apple,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+4,presearch,direct,Can I get a loaf of white bread?,bread,white bread,move,[2],I found those items. They are in Aisle(s) 2.,True,True,False,[],0.0
+5,presearch,direct,I would like some orange juice,juice,orange juice; orange,move,"[3, 4]","I found those items. They are in Aisle(s) 3, 4.",True,True,False,[],0.0
+1,semantic,direct,Where can I find milk?,milk,milk,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.001
+2,semantic,direct,Do you have cheddar cheese?,cheese,cheddar cheese; cheese,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
+3,semantic,direct,I need some apples please,apple,apple,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+4,semantic,direct,Can I get a loaf of white bread?,bread,white bread,move,[2],I found those items. They are in Aisle(s) 2.,True,True,False,[],0.0
+5,semantic,direct,I would like some orange juice,juice,orange juice; orange,move,[4],I found those items. They are in Aisle(s) 4.,True,True,False,[],0.0
+16,semantic,associative,I'm hosting a party and need snacks and drinks,chips; cookies; soda; juice,hosting; party; snacks; drinks,move,[4],I found those items. They are in Aisle(s) 4.,True,True,False,[],0.0
+17,semantic,associative,I want something healthy for my lunch,apple; carrot; water,healthy; lunch,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+18,semantic,associative,I need something sweet to snack on,cookies; donut; granola,sweet; snack,move,[5],I found those items. They are in Aisle(s) 5.,True,True,False,[],0.0
+19,semantic,associative,"I am going on a hike, what should I take?",water; nuts; granola,going; hike; what; should; take,none,[],"Sorry, we don't carry those items.",True,False,False,[],0.0
+20,semantic,associative,I want to make a hot beverage this morning,coffee; milk,make; hot; beverage; this; morning,move,[4],I found those items. They are in Aisle(s) 4.,True,True,False,[],0.0
+21,semantic,not_in_store,Do you carry sushi ingredients?,,carry; sushi; ingredients,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+22,semantic,not_in_store,Where can I find dog food?,,dog; food,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+23,semantic,not_in_store,I need some fresh salmon,,fresh; salmon,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+24,semantic,not_in_store,Do you sell pasta?,,sell; pasta,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+25,semantic,not_in_store,Can I get some ice cream?,,ice; cream,move,[4],I found those items. They are in Aisle(s) 4.,True,False,False,[],0.0
+26,semantic,conversational,"Hello there, how are you today?",,hello; there; how; today,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+27,semantic,conversational,What can you help me with?,,what; help,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+28,semantic,conversational,What are your opening hours?,,what; opening; hours,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+29,semantic,conversational,Hi! I'm new here. Can you explain how this store works?,,new; here; explain; how; this; store; works,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+30,semantic,conversational,Thank you for your help!,,thank; help,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+31,semantic,direct,I need milk and bananas,milk; banana,banana,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+32,semantic,direct,Can you add apples and oranges to my cart?,apple; orange,orange; apple,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+33,semantic,direct,I would like broccoli and carrots,broccoli; carrot,broccoli; carrot,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+34,semantic,direct,Please get me wheat bread and coffee,bread; coffee,wheat bread; coffee,move,[2],I found those items. They are in Aisle(s) 2.,True,True,False,[],0.0
+35,semantic,direct,Do you have grapes and granola bars?,grape; granola,granola bar; granola; grape,move,[5],I found those items. They are in Aisle(s) 5.,True,True,False,[],0.0
+36,semantic,recipe,I need ingredients to bake chocolate chip cookies,flour; eggs; sugar; butter,cookies,move,[5],I found those items. They are in Aisle(s) 5.,True,False,False,[],0.0
+37,semantic,recipe,What do I need to make a vegetable stir fry?,broccoli; carrot; lettuce,what; make; vegetable; stir; fry,none,[],"Sorry, we don't carry those items.",True,False,False,[],0.0
+38,semantic,recipe,"I want to make pancakes, what ingredients do you have?",flour; milk; eggs,milk; cheese; bread_white; yogurt,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
+39,semantic,recipe,Help me find everything for a fruit salad,apple; banana; orange; grape,lettuce; tomato; carrot; broccoli,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+40,semantic,recipe,I need to bake banana bread,banana; flour; eggs,banana,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+41,semantic,associative,Something for my kids' lunchbox,apple; granola; yogurt; juice,kids; lunchbox,none,[],"Sorry, we don't carry those items.",True,False,False,[],0.0
+42,semantic,associative,I want a healthy breakfast option,yogurt; granola; apple,milk; bread_white; banana; coffee,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+43,semantic,associative,What do you have for a movie night?,popcorn; soda; chips; cookies,what; have; movie; night,none,[],"Sorry, we don't carry those items.",True,False,False,[],0.0
+44,semantic,associative,I need something for a late night snack,chips; cookies; nuts,late; night; snack,move,[5],I found those items. They are in Aisle(s) 5.,True,True,False,[],0.0
+45,semantic,associative,I'm trying to eat more vegetables this week,broccoli; carrot; tomato; lettuce,trying; eat; more; vegetables; this; week,move,[2],I found those items. They are in Aisle(s) 2.,True,True,False,[],0.0
+1,presearch,direct,Where can I find milk?,milk,,none,[],How can I help you?,True,False,False,[],0.0
+1,semantic,direct,Where can I find milk?,milk,milk,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
+1,llm_only,direct,Where can I find milk?,milk,,none,[],How can I help you?,True,False,False,[],0.0
+2,presearch,direct,Do you have cheddar cheese?,cheese,cheddar cheese; cheese,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
+2,semantic,direct,Do you have cheddar cheese?,cheese,cheddar cheese; cheese,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
+2,llm_only,direct,Do you have cheddar cheese?,cheese,,none,[],How can I help you?,True,False,False,[],0.0
+3,presearch,direct,I need some apples please,apple,apple,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+3,semantic,direct,I need some apples please,apple,apple,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+3,llm_only,direct,I need some apples please,apple,,none,[],How can I help you?,True,False,False,[],0.0
+4,presearch,direct,Can I get a loaf of white bread?,bread,white bread,move,[2],I found those items. They are in Aisle(s) 2.,True,True,False,[],0.0
+4,semantic,direct,Can I get a loaf of white bread?,bread,white bread,move,[2],I found those items. They are in Aisle(s) 2.,True,True,False,[],0.0
+4,llm_only,direct,Can I get a loaf of white bread?,bread,,none,[],How can I help you?,True,False,False,[],0.0
+5,presearch,direct,I would like some orange juice,juice,orange juice; orange,move,"[3, 4]","I found those items. They are in Aisle(s) 3, 4.",True,True,False,[],0.0
+5,semantic,direct,I would like some orange juice,juice,orange juice; orange,move,[4],I found those items. They are in Aisle(s) 4.,True,True,False,[],0.0
+5,llm_only,direct,I would like some orange juice,juice,,none,[],How can I help you?,True,False,False,[],0.0
+6,presearch,direct,Where are the potato chips?,chips,potato chips; chips,move,[5],I found those items. They are in Aisle(s) 5.,True,True,False,[],0.0
+6,semantic,direct,Where are the potato chips?,chips,potato chips; chips,move,[5],I found those items. They are in Aisle(s) 5.,True,True,False,[],0.0
+6,llm_only,direct,Where are the potato chips?,chips,,none,[],How can I help you?,True,False,False,[],0.0
+7,presearch,direct,Can you help me find bottled water?,water,bottled water; water,move,[4],I found those items. They are in Aisle(s) 4.,True,True,False,[],0.0
+7,semantic,direct,Can you help me find bottled water?,water,bottled water; water,move,[4],I found those items. They are in Aisle(s) 4.,True,True,False,[],0.0
+7,llm_only,direct,Can you help me find bottled water?,water,,none,[],How can I help you?,True,False,False,[],0.0
+8,presearch,direct,I need a banana,banana,banana,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+8,semantic,direct,I need a banana,banana,banana,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+8,llm_only,direct,I need a banana,banana,,none,[],How can I help you?,True,False,False,[],0.0
+9,presearch,direct,Do you sell croissants?,croissant,croissant,move,[2],I found those items. They are in Aisle(s) 2.,True,True,False,[],0.0
+9,semantic,direct,Do you sell croissants?,croissant,croissant,move,[2],I found those items. They are in Aisle(s) 2.,True,True,False,[],0.0
+9,llm_only,direct,Do you sell croissants?,croissant,,none,[],How can I help you?,True,False,False,[],0.0
+10,presearch,direct,I am looking for plain yogurt,yogurt,plain yogurt; yogurt,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
+10,semantic,direct,I am looking for plain yogurt,yogurt,plain yogurt; yogurt,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
+10,llm_only,direct,I am looking for plain yogurt,yogurt,,none,[],How can I help you?,True,False,False,[],0.0
+11,presearch,recipe,"I want to bake a birthday cake, what do I need?",flour; eggs; sugar; butter; milk,milk; cheese; bread_white; yogurt,move,"[1, 2]","I found those items. They are in Aisle(s) 1, 2.",True,True,False,[],0.0
+11,semantic,recipe,"I want to bake a birthday cake, what do I need?",flour; eggs; sugar; butter; milk,milk; cheese; bread_white; yogurt,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
+11,llm_only,recipe,"I want to bake a birthday cake, what do I need?",flour; eggs; sugar; butter; milk,,none,[],How can I help you?,True,False,False,[],0.0
+12,presearch,recipe,I need ingredients to make a salad,lettuce; tomato; carrot,lettuce; tomato; carrot; broccoli,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+12,semantic,recipe,I need ingredients to make a salad,lettuce; tomato; carrot,lettuce; tomato; carrot; broccoli,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+12,llm_only,recipe,I need ingredients to make a salad,lettuce; tomato; carrot,,none,[],How can I help you?,True,False,False,[],0.0
+13,presearch,recipe,Can you help me find everything I need for a fruit smoothie?,banana; apple; orange; yogurt,banana; apple; orange; yogurt,move,"[1, 3]","I found those items. They are in Aisle(s) 1, 3.",True,True,False,[],0.0
+13,semantic,recipe,Can you help me find everything I need for a fruit smoothie?,banana; apple; orange; yogurt,banana; apple; orange; yogurt,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+13,llm_only,recipe,Can you help me find everything I need for a fruit smoothie?,banana; apple; orange; yogurt,,none,[],How can I help you?,True,False,False,[],0.0
+14,presearch,recipe,"I want to make breakfast, what do you have?",bread; milk; yogurt,milk; bread_white; banana; coffee,move,"[1, 2, 3, 4]","I found those items. They are in Aisle(s) 1, 2, 3, 4.",True,True,False,[],0.0
+14,semantic,recipe,"I want to make breakfast, what do you have?",bread; milk; yogurt,milk; bread_white; banana; coffee,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
+14,llm_only,recipe,"I want to make breakfast, what do you have?",bread; milk; yogurt,,none,[],How can I help you?,True,False,False,[],0.0
+15,presearch,recipe,What do I need to make a cheese sandwich?,bread; cheese,bread_white; cheese; tomato; lettuce,move,"[1, 2, 3]","I found those items. They are in Aisle(s) 1, 2, 3.",True,True,False,[],0.0
+15,semantic,recipe,What do I need to make a cheese sandwich?,bread; cheese,bread_white; cheese; tomato; lettuce,move,[2],I found those items. They are in Aisle(s) 2.,True,True,False,[],0.0
+15,llm_only,recipe,What do I need to make a cheese sandwich?,bread; cheese,,none,[],How can I help you?,True,False,False,[],0.0
+16,presearch,associative,I'm hosting a party and need snacks and drinks,chips; cookies; soda; juice,,none,[],How can I help you?,True,False,False,[],0.0
+16,semantic,associative,I'm hosting a party and need snacks and drinks,chips; cookies; soda; juice,hosting; party; snacks; drinks,move,[4],I found those items. They are in Aisle(s) 4.,True,True,False,[],0.0
+16,llm_only,associative,I'm hosting a party and need snacks and drinks,chips; cookies; soda; juice,,none,[],How can I help you?,True,False,False,[],0.0
+17,presearch,associative,I want something healthy for my lunch,apple; carrot; water,,none,[],How can I help you?,True,False,False,[],0.0
+17,semantic,associative,I want something healthy for my lunch,apple; carrot; water,healthy; lunch,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+17,llm_only,associative,I want something healthy for my lunch,apple; carrot; water,,none,[],How can I help you?,True,False,False,[],0.0
+18,presearch,associative,I need something sweet to snack on,cookies; donut; granola,,none,[],How can I help you?,True,False,False,[],0.0
+18,semantic,associative,I need something sweet to snack on,cookies; donut; granola,sweet; snack,move,[5],I found those items. They are in Aisle(s) 5.,True,True,False,[],0.0
+18,llm_only,associative,I need something sweet to snack on,cookies; donut; granola,,none,[],How can I help you?,True,False,False,[],0.0
+19,presearch,associative,"I am going on a hike, what should I take?",water; nuts; granola,,none,[],How can I help you?,True,False,False,[],0.0
+19,semantic,associative,"I am going on a hike, what should I take?",water; nuts; granola,going; hike; what; should; take,none,[],"Sorry, we don't carry those items.",True,False,False,[],0.0
+19,llm_only,associative,"I am going on a hike, what should I take?",water; nuts; granola,,none,[],How can I help you?,True,False,False,[],0.0
+20,presearch,associative,I want to make a hot beverage this morning,coffee; milk,,none,[],How can I help you?,True,False,False,[],0.0
+20,semantic,associative,I want to make a hot beverage this morning,coffee; milk,make; hot; beverage; this; morning,move,[4],I found those items. They are in Aisle(s) 4.,True,True,False,[],0.0
+20,llm_only,associative,I want to make a hot beverage this morning,coffee; milk,,none,[],How can I help you?,True,False,False,[],0.0
+21,presearch,not_in_store,Do you carry sushi ingredients?,,,none,[],How can I help you?,True,True,False,[],0.0
+21,semantic,not_in_store,Do you carry sushi ingredients?,,carry; sushi; ingredients,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+21,llm_only,not_in_store,Do you carry sushi ingredients?,,,none,[],How can I help you?,True,True,False,[],0.0
+22,presearch,not_in_store,Where can I find dog food?,,,none,[],How can I help you?,True,True,False,[],0.0
+22,semantic,not_in_store,Where can I find dog food?,,dog; food,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+22,llm_only,not_in_store,Where can I find dog food?,,,none,[],How can I help you?,True,True,False,[],0.0
+23,presearch,not_in_store,I need some fresh salmon,,,none,[],How can I help you?,True,True,False,[],0.0
+23,semantic,not_in_store,I need some fresh salmon,,fresh; salmon,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+23,llm_only,not_in_store,I need some fresh salmon,,,none,[],How can I help you?,True,True,False,[],0.0
+24,presearch,not_in_store,Do you sell pasta?,,,none,[],How can I help you?,True,True,False,[],0.0
+24,semantic,not_in_store,Do you sell pasta?,,sell; pasta,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+24,llm_only,not_in_store,Do you sell pasta?,,,none,[],How can I help you?,True,True,False,[],0.0
+25,presearch,not_in_store,Can I get some ice cream?,,,none,[],How can I help you?,True,True,False,[],0.0
+25,semantic,not_in_store,Can I get some ice cream?,,ice; cream,move,[4],I found those items. They are in Aisle(s) 4.,True,False,False,[],0.0
+25,llm_only,not_in_store,Can I get some ice cream?,,,none,[],How can I help you?,True,True,False,[],0.0
+26,presearch,conversational,"Hello there, how are you today?",,,none,[],How can I help you?,True,True,False,[],0.0
+26,semantic,conversational,"Hello there, how are you today?",,hello; there; how; today,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+26,llm_only,conversational,"Hello there, how are you today?",,,none,[],How can I help you?,True,True,False,[],0.0
+27,presearch,conversational,What can you help me with?,,,none,[],How can I help you?,True,True,False,[],0.0
+27,semantic,conversational,What can you help me with?,,what; help,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+27,llm_only,conversational,What can you help me with?,,,none,[],How can I help you?,True,True,False,[],0.0
+28,presearch,conversational,What are your opening hours?,,,none,[],How can I help you?,True,True,False,[],0.0
+28,semantic,conversational,What are your opening hours?,,what; opening; hours,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+28,llm_only,conversational,What are your opening hours?,,,none,[],How can I help you?,True,True,False,[],0.0
+29,presearch,conversational,Hi! I'm new here. Can you explain how this store works?,,,none,[],How can I help you?,True,True,False,[],0.0
+29,semantic,conversational,Hi! I'm new here. Can you explain how this store works?,,new; here; explain; how; this; store; works,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+29,llm_only,conversational,Hi! I'm new here. Can you explain how this store works?,,,none,[],How can I help you?,True,True,False,[],0.0
+30,presearch,conversational,Thank you for your help!,,,none,[],How can I help you?,True,True,False,[],0.0
+30,semantic,conversational,Thank you for your help!,,thank; help,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+30,llm_only,conversational,Thank you for your help!,,,none,[],How can I help you?,True,True,False,[],0.0
+31,presearch,direct,I need milk and bananas,milk; banana,banana,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+31,semantic,direct,I need milk and bananas,milk; banana,banana,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+31,llm_only,direct,I need milk and bananas,milk; banana,,none,[],How can I help you?,True,False,False,[],0.0
+32,presearch,direct,Can you add apples and oranges to my cart?,apple; orange,orange; apple,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+32,semantic,direct,Can you add apples and oranges to my cart?,apple; orange,orange; apple,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+32,llm_only,direct,Can you add apples and oranges to my cart?,apple; orange,,none,[],How can I help you?,True,False,False,[],0.0
+33,presearch,direct,I would like broccoli and carrots,broccoli; carrot,broccoli; carrot,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+33,semantic,direct,I would like broccoli and carrots,broccoli; carrot,broccoli; carrot,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+33,llm_only,direct,I would like broccoli and carrots,broccoli; carrot,,none,[],How can I help you?,True,False,False,[],0.0
+34,presearch,direct,Please get me wheat bread and coffee,bread; coffee,wheat bread; coffee,move,"[2, 4]","I found those items. They are in Aisle(s) 2, 4.",True,True,False,[],0.0
+34,semantic,direct,Please get me wheat bread and coffee,bread; coffee,wheat bread; coffee,move,[2],I found those items. They are in Aisle(s) 2.,True,True,False,[],0.0
+34,llm_only,direct,Please get me wheat bread and coffee,bread; coffee,,none,[],How can I help you?,True,False,False,[],0.0
+35,presearch,direct,Do you have grapes and granola bars?,grape; granola,granola bar; granola; grape,move,"[3, 5]","I found those items. They are in Aisle(s) 3, 5.",True,True,False,[],0.0
+35,semantic,direct,Do you have grapes and granola bars?,grape; granola,granola bar; granola; grape,move,[5],I found those items. They are in Aisle(s) 5.,True,True,False,[],0.0
+35,llm_only,direct,Do you have grapes and granola bars?,grape; granola,,none,[],How can I help you?,True,False,False,[],0.0
+36,presearch,recipe,I need ingredients to bake chocolate chip cookies,flour; eggs; sugar; butter,cookies,move,[5],I found those items. They are in Aisle(s) 5.,True,False,False,[],0.0
+36,semantic,recipe,I need ingredients to bake chocolate chip cookies,flour; eggs; sugar; butter,cookies,move,[5],I found those items. They are in Aisle(s) 5.,True,False,False,[],0.0
+36,llm_only,recipe,I need ingredients to bake chocolate chip cookies,flour; eggs; sugar; butter,,none,[],How can I help you?,True,True,False,[],0.0
+37,presearch,recipe,What do I need to make a vegetable stir fry?,broccoli; carrot; lettuce,,none,[],How can I help you?,True,False,False,[],0.0
+37,semantic,recipe,What do I need to make a vegetable stir fry?,broccoli; carrot; lettuce,what; make; vegetable; stir; fry,none,[],"Sorry, we don't carry those items.",True,False,False,[],0.0
+37,llm_only,recipe,What do I need to make a vegetable stir fry?,broccoli; carrot; lettuce,,none,[],How can I help you?,True,False,False,[],0.0
+38,presearch,recipe,"I want to make pancakes, what ingredients do you have?",flour; milk; eggs,milk; cheese; bread_white; yogurt,move,"[1, 2]","I found those items. They are in Aisle(s) 1, 2.",True,True,False,[],0.0
+38,semantic,recipe,"I want to make pancakes, what ingredients do you have?",flour; milk; eggs,milk; cheese; bread_white; yogurt,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
+38,llm_only,recipe,"I want to make pancakes, what ingredients do you have?",flour; milk; eggs,,none,[],How can I help you?,True,False,False,[],0.0
+39,presearch,recipe,Help me find everything for a fruit salad,apple; banana; orange; grape,lettuce; tomato; carrot; broccoli,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+39,semantic,recipe,Help me find everything for a fruit salad,apple; banana; orange; grape,lettuce; tomato; carrot; broccoli,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+39,llm_only,recipe,Help me find everything for a fruit salad,apple; banana; orange; grape,,none,[],How can I help you?,True,False,False,[],0.0
+40,presearch,recipe,I need to bake banana bread,banana; flour; eggs,banana,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+40,semantic,recipe,I need to bake banana bread,banana; flour; eggs,banana,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+40,llm_only,recipe,I need to bake banana bread,banana; flour; eggs,,none,[],How can I help you?,True,False,False,[],0.0
+41,presearch,associative,Something for my kids' lunchbox,apple; granola; yogurt; juice,,none,[],How can I help you?,True,False,False,[],0.0
+41,semantic,associative,Something for my kids' lunchbox,apple; granola; yogurt; juice,kids; lunchbox,none,[],"Sorry, we don't carry those items.",True,False,False,[],0.0
+41,llm_only,associative,Something for my kids' lunchbox,apple; granola; yogurt; juice,,none,[],How can I help you?,True,False,False,[],0.0
+42,presearch,associative,I want a healthy breakfast option,yogurt; granola; apple,milk; bread_white; banana; coffee,move,"[1, 2, 3, 4]","I found those items. They are in Aisle(s) 1, 2, 3, 4.",True,True,False,[],0.0
+42,semantic,associative,I want a healthy breakfast option,yogurt; granola; apple,milk; bread_white; banana; coffee,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0
+42,llm_only,associative,I want a healthy breakfast option,yogurt; granola; apple,,none,[],How can I help you?,True,False,False,[],0.0
+43,presearch,associative,What do you have for a movie night?,popcorn; soda; chips; cookies,,none,[],How can I help you?,True,False,False,[],0.0
+43,semantic,associative,What do you have for a movie night?,popcorn; soda; chips; cookies,what; have; movie; night,none,[],"Sorry, we don't carry those items.",True,False,False,[],0.0
+43,llm_only,associative,What do you have for a movie night?,popcorn; soda; chips; cookies,,none,[],How can I help you?,True,False,False,[],0.0
+44,presearch,associative,I need something for a late night snack,chips; cookies; nuts,,none,[],How can I help you?,True,False,False,[],0.0
+44,semantic,associative,I need something for a late night snack,chips; cookies; nuts,late; night; snack,move,[5],I found those items. They are in Aisle(s) 5.,True,True,False,[],0.0
+44,llm_only,associative,I need something for a late night snack,chips; cookies; nuts,,none,[],How can I help you?,True,False,False,[],0.0
+45,presearch,associative,I'm trying to eat more vegetables this week,broccoli; carrot; tomato; lettuce,,none,[],How can I help you?,True,False,False,[],0.0
+45,semantic,associative,I'm trying to eat more vegetables this week,broccoli; carrot; tomato; lettuce,trying; eat; more; vegetables; this; week,move,[2],I found those items. They are in Aisle(s) 2.,True,True,False,[],0.0
+45,llm_only,associative,I'm trying to eat more vegetables this week,broccoli; carrot; tomato; lettuce,,none,[],How can I help you?,True,False,False,[],0.0
+46,presearch,not_in_store,Do you stock flour?,,,none,[],How can I help you?,True,True,False,[],0.0
+46,semantic,not_in_store,Do you stock flour?,,stock; flour,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+46,llm_only,not_in_store,Do you stock flour?,,,none,[],How can I help you?,True,True,False,[],0.0
+47,presearch,not_in_store,I need to find some eggs,,,none,[],How can I help you?,True,True,False,[],0.0
+47,semantic,not_in_store,I need to find some eggs,,eggs,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+47,llm_only,not_in_store,I need to find some eggs,,,none,[],How can I help you?,True,True,False,[],0.0
+48,presearch,not_in_store,Where is the butter?,,,none,[],How can I help you?,True,True,False,[],0.0
+48,semantic,not_in_store,Where is the butter?,,butter,none,[],"Sorry, we don't carry those items.",True,True,False,[],0.0
+48,llm_only,not_in_store,Where is the butter?,,,none,[],How can I help you?,True,True,False,[],0.0
+49,presearch,direct,Can I get 2 litres of milk please?,milk,,none,[],How can I help you?,True,False,False,[],0.0
+49,semantic,direct,Can I get 2 litres of milk please?,milk,milk; litres,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
+49,llm_only,direct,Can I get 2 litres of milk please?,milk,,none,[],How can I help you?,True,False,False,[],0.0
+50,presearch,direct,I need cola and some mixed nuts,soda; nuts,mixed nuts; nuts,move,[5],I found those items. They are in Aisle(s) 5.,True,True,False,[],0.0
+50,semantic,direct,I need cola and some mixed nuts,soda; nuts,mixed nuts; nuts,move,[5],I found those items. They are in Aisle(s) 5.,True,True,False,[],0.0
+50,llm_only,direct,I need cola and some mixed nuts,soda; nuts,,none,[],How can I help you?,True,False,False,[],0.0
