@@ -86,7 +86,7 @@ def _log(msg):
 def _strip_reasoning_sections(text: str) -> str:
     """Remove model reasoning blocks (e.g. <think>...</think>) from text."""
     stripped = re.sub(
-        r"<\s*(?:think|thinking)\b[^>]*>[\s\S]*?<\s*/\s*(?:think|thinking)\s*>",
+        r"<\s*(?:think|thinking)\b[^>]*>[\s\S]*?<\s*/(?:think|thinking)\s*>",
         " ",
         text,
         flags=re.IGNORECASE,
