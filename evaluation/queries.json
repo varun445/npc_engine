@@ -242,7 +242,7 @@
     "query_type": "associative",
     "expected_items": [
       "apple",
-      "baby spinach",
+      "spinach",
       "yogurt"
     ]
   },
@@ -313,7 +313,7 @@
     "expected_items": [
       "broccoli",
       "carrot",
-      "baby spinach"
+      "spinach"
     ]
   },
   {
