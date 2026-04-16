@@ -394,6 +394,8 @@ def _find_hallucinated_aisles(response: dict, expected_aisles: set[int] | None =
         aisle_num = int(m.group(1))
         if aisle_num not in VALID_AISLES and aisle_num not in invalid:
             invalid.append(aisle_num)
+        elif expected_aisles and aisle_num not in expected_aisles and aisle_num not in invalid:
+            invalid.append(aisle_num)
 
     # 4. Plural/compound aisle mentions, e.g. "Aisles 1 and 9"
     for m in AISLE_CLAUSE_RE.finditer(dialogue):
