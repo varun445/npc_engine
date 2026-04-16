@@ -1,302 +1,650 @@
 [
   {
     "id": 1,
-    "query": "Where can I find milk?",
+    "query": "Where can I find Milk (1L)?",
     "query_type": "direct",
-    "expected_items": ["milk"]
+    "expected_items": [
+      "milk_1l"
+    ]
   },
   {
     "id": 2,
-    "query": "Do you have cheddar cheese?",
+    "query": "Do you have Large Eggs (12ct)?",
     "query_type": "direct",
-    "expected_items": ["cheese"]
+    "expected_items": [
+      "eggs_large"
+    ]
   },
   {
     "id": 3,
-    "query": "I need some apples please",
+    "query": "Please help me find Whole Wheat Wraps.",
     "query_type": "direct",
-    "expected_items": ["apple"]
+    "expected_items": [
+      "tortilla_wraps"
+    ]
   },
   {
     "id": 4,
-    "query": "Can I get a loaf of white bread?",
+    "query": "I need Black Beans (Can).",
     "query_type": "direct",
-    "expected_items": ["bread"]
+    "expected_items": [
+      "black_beans_can"
+    ]
   },
   {
     "id": 5,
-    "query": "I would like some orange juice",
+    "query": "Can I get Frozen Pizza?",
     "query_type": "direct",
-    "expected_items": ["juice"]
+    "expected_items": [
+      "frozen_pizza"
+    ]
   },
   {
     "id": 6,
-    "query": "Where are the potato chips?",
+    "query": "Where is Chicken Breast (1lb)?",
     "query_type": "direct",
-    "expected_items": ["chips"]
+    "expected_items": [
+      "chicken_breast"
+    ]
   },
   {
     "id": 7,
-    "query": "Can you help me find bottled water?",
+    "query": "Do you carry Dish Soap?",
     "query_type": "direct",
-    "expected_items": ["water"]
+    "expected_items": [
+      "dish_soap"
+    ]
   },
   {
     "id": 8,
-    "query": "I need a banana",
+    "query": "I want Sparkling Water.",
     "query_type": "direct",
-    "expected_items": ["banana"]
+    "expected_items": [
+      "sparkling_water"
+    ]
   },
   {
     "id": 9,
-    "query": "Do you sell croissants?",
+    "query": "Could you find Toothpaste for me?",
     "query_type": "direct",
-    "expected_items": ["croissant"]
+    "expected_items": [
+      "toothpaste"
+    ]
   },
   {
     "id": 10,
-    "query": "I am looking for plain yogurt",
+    "query": "I'm looking for Trail Mix.",
     "query_type": "direct",
-    "expected_items": ["yogurt"]
+    "expected_items": [
+      "trail_mix"
+    ]
   },
   {
     "id": 11,
-    "query": "I want to bake a birthday cake, what do I need?",
+    "query": "I want to bake chocolate chip cookies. What ingredients should I pick up?",
     "query_type": "recipe",
-    "expected_items": ["flour", "eggs", "sugar", "butter", "milk"]
+    "expected_items": [
+      "flour_all_purpose",
+      "sugar_granulated",
+      "butter_unsalted",
+      "eggs_large"
+    ]
   },
   {
     "id": 12,
-    "query": "I need ingredients to make a salad",
+    "query": "What do I need for spaghetti night?",
     "query_type": "recipe",
-    "expected_items": ["lettuce", "tomato", "carrot"]
+    "expected_items": [
+      "pasta_spaghetti",
+      "tomato_sauce",
+      "olive_oil"
+    ]
   },
   {
     "id": 13,
-    "query": "Can you help me find everything I need for a fruit smoothie?",
+    "query": "Help me build ingredients for a chicken salad.",
     "query_type": "recipe",
-    "expected_items": ["banana", "apple", "orange", "yogurt"]
+    "expected_items": [
+      "chicken_breast",
+      "lettuce",
+      "tomato",
+      "olive_oil"
+    ]
   },
   {
     "id": 14,
-    "query": "I want to make breakfast, what do you have?",
+    "query": "I need supplies for breakfast pancakes.",
     "query_type": "recipe",
-    "expected_items": ["bread", "milk", "yogurt"]
+    "expected_items": [
+      "flour_all_purpose",
+      "milk_1l",
+      "eggs_large",
+      "butter_unsalted"
+    ]
   },
   {
     "id": 15,
-    "query": "What do I need to make a cheese sandwich?",
+    "query": "What should I buy for a veggie stir-fry?",
     "query_type": "recipe",
-    "expected_items": ["bread", "cheese"]
+    "expected_items": [
+      "broccoli",
+      "carrot",
+      "bell_pepper",
+      "onion_yellow"
+    ]
   },
   {
     "id": 16,
-    "query": "I'm hosting a party and need snacks and drinks",
-    "query_type": "associative",
-    "expected_items": ["chips", "cookies", "soda", "juice"]
+    "query": "I want to make smoothies this week.",
+    "query_type": "recipe",
+    "expected_items": [
+      "banana",
+      "strawberry",
+      "blueberry",
+      "yogurt"
+    ]
   },
   {
     "id": 17,
-    "query": "I want something healthy for my lunch",
-    "query_type": "associative",
-    "expected_items": ["apple", "carrot", "water"]
+    "query": "What ingredients do I need for grilled salmon with lemon?",
+    "query_type": "recipe",
+    "expected_items": [
+      "salmon_fillet",
+      "lemon",
+      "olive_oil"
+    ]
   },
   {
     "id": 18,
-    "query": "I need something sweet to snack on",
-    "query_type": "associative",
-    "expected_items": ["cookies", "donut", "granola"]
+    "query": "Help me prepare taco night.",
+    "query_type": "recipe",
+    "expected_items": [
+      "ground_beef",
+      "tortilla_wraps",
+      "tomato",
+      "lettuce"
+    ]
   },
   {
     "id": 19,
-    "query": "I am going on a hike, what should I take?",
-    "query_type": "associative",
-    "expected_items": ["water", "nuts", "granola"]
+    "query": "I want to cook fried rice.",
+    "query_type": "recipe",
+    "expected_items": [
+      "rice_white",
+      "eggs_large",
+      "onion_yellow"
+    ]
   },
   {
     "id": 20,
-    "query": "I want to make a hot beverage this morning",
-    "query_type": "associative",
-    "expected_items": ["coffee", "milk"]
+    "query": "What do I need for homemade tomato soup?",
+    "query_type": "recipe",
+    "expected_items": [
+      "tomato_sauce",
+      "onion_yellow",
+      "sour_cream"
+    ]
   },
   {
     "id": 21,
-    "query": "Do you carry sushi ingredients?",
-    "query_type": "not_in_store",
-    "expected_items": []
+    "query": "I need ingredients for chicken nuggets and fries dinner.",
+    "query_type": "recipe",
+    "expected_items": [
+      "frozen_nuggets",
+      "frozen_fries"
+    ]
   },
   {
     "id": 22,
-    "query": "Where can I find dog food?",
-    "query_type": "not_in_store",
-    "expected_items": []
+    "query": "Can you suggest items for an avocado toast breakfast?",
+    "query_type": "recipe",
+    "expected_items": [
+      "avocado",
+      "bread_wheat",
+      "lemon"
+    ]
   },
   {
     "id": 23,
-    "query": "I need some fresh salmon",
-    "query_type": "not_in_store",
-    "expected_items": []
+    "query": "What do I need for a yogurt parfait?",
+    "query_type": "recipe",
+    "expected_items": [
+      "yogurt",
+      "granola",
+      "blueberry",
+      "strawberry"
+    ]
   },
   {
     "id": 24,
-    "query": "Do you sell pasta?",
-    "query_type": "not_in_store",
-    "expected_items": []
+    "query": "I want to make a simple bean pasta meal.",
+    "query_type": "recipe",
+    "expected_items": [
+      "pasta_spaghetti",
+      "black_beans_can",
+      "tomato_sauce"
+    ]
   },
   {
     "id": 25,
-    "query": "Can I get some ice cream?",
+    "query": "Help me shop for a turkey sandwich lunch.",
+    "query_type": "recipe",
+    "expected_items": [
+      "turkey_slices",
+      "bread_white",
+      "lettuce",
+      "tomato"
+    ]
+  },
+  {
+    "id": 26,
+    "query": "I want something healthy for lunch.",
+    "query_type": "associative",
+    "expected_items": [
+      "apple",
+      "baby spinach",
+      "yogurt"
+    ]
+  },
+  {
+    "id": 27,
+    "query": "What are good high-protein options?",
+    "query_type": "associative",
+    "expected_items": [
+      "chicken_breast",
+      "tofu_firm",
+      "eggs_large"
+    ]
+  },
+  {
+    "id": 28,
+    "query": "I need quick frozen dinner ideas.",
+    "query_type": "associative",
+    "expected_items": [
+      "frozen_pizza",
+      "frozen_nuggets",
+      "frozen_fries"
+    ]
+  },
+  {
+    "id": 29,
+    "query": "Give me party snack and drink recommendations.",
+    "query_type": "associative",
+    "expected_items": [
+      "chips",
+      "popcorn",
+      "soda"
+    ]
+  },
+  {
+    "id": 30,
+    "query": "I want low-sugar drink choices.",
+    "query_type": "associative",
+    "expected_items": [
+      "water",
+      "sparkling_water",
+      "tea_green"
+    ]
+  },
+  {
+    "id": 31,
+    "query": "What's good for a movie night at home?",
+    "query_type": "associative",
+    "expected_items": [
+      "popcorn",
+      "chips",
+      "soda"
+    ]
+  },
+  {
+    "id": 32,
+    "query": "Recommend easy breakfast basics.",
+    "query_type": "associative",
+    "expected_items": [
+      "milk_1l",
+      "bread_white",
+      "eggs_large"
+    ]
+  },
+  {
+    "id": 33,
+    "query": "I'm trying to eat more vegetables this week.",
+    "query_type": "associative",
+    "expected_items": [
+      "broccoli",
+      "carrot",
+      "baby spinach"
+    ]
+  },
+  {
+    "id": 34,
+    "query": "Suggest lunchbox items for kids.",
+    "query_type": "associative",
+    "expected_items": [
+      "apple",
+      "granola",
+      "juice_apple"
+    ]
+  },
+  {
+    "id": 35,
+    "query": "What should I buy for a road trip snack bag?",
+    "query_type": "associative",
+    "expected_items": [
+      "trail_mix",
+      "pretzels",
+      "water"
+    ]
+  },
+  {
+    "id": 36,
+    "query": "I need comfort food staples.",
+    "query_type": "associative",
+    "expected_items": [
+      "pasta_spaghetti",
+      "tomato_sauce",
+      "cheese"
+    ]
+  },
+  {
+    "id": 37,
+    "query": "Show me budget-friendly meal starters.",
+    "query_type": "associative",
+    "expected_items": [
+      "rice_white",
+      "black_beans_can",
+      "tomato_sauce"
+    ]
+  },
+  {
+    "id": 38,
+    "query": "I want post-workout recovery options.",
+    "query_type": "associative",
+    "expected_items": [
+      "sports_drink",
+      "eggs_large",
+      "banana"
+    ]
+  },
+  {
+    "id": 39,
+    "query": "What can I buy for a picnic?",
+    "query_type": "associative",
+    "expected_items": [
+      "bread_white",
+      "turkey_slices",
+      "juice_orange"
+    ]
+  },
+  {
+    "id": 40,
+    "query": "I'm looking for late-night light snacks.",
+    "query_type": "associative",
+    "expected_items": [
+      "granola",
+      "crackers",
+      "sparkling_water"
+    ]
+  },
+  {
+    "id": 41,
+    "query": "Do you have baby formula?",
     "query_type": "not_in_store",
     "expected_items": []
   },
   {
-    "id": 26,
-    "query": "Hello there, how are you today?",
-    "query_type": "conversational",
-    "expected_items": []
-  },
-  {
-    "id": 27,
-    "query": "What can you help me with?",
-    "query_type": "conversational",
-    "expected_items": []
-  },
-  {
-    "id": 28,
-    "query": "What are your opening hours?",
-    "query_type": "conversational",
-    "expected_items": []
-  },
-  {
-    "id": 29,
-    "query": "Hi! I'm new here. Can you explain how this store works?",
-    "query_type": "conversational",
-    "expected_items": []
-  },
-  {
-    "id": 30,
-    "query": "Thank you for your help!",
-    "query_type": "conversational",
-    "expected_items": []
-  },
-  {
-    "id": 31,
-    "query": "I need milk and bananas",
-    "query_type": "direct",
-    "expected_items": ["milk", "banana"]
-  },
-  {
-    "id": 32,
-    "query": "Can you add apples and oranges to my cart?",
-    "query_type": "direct",
-    "expected_items": ["apple", "orange"]
-  },
-  {
-    "id": 33,
-    "query": "I would like broccoli and carrots",
-    "query_type": "direct",
-    "expected_items": ["broccoli", "carrot"]
-  },
-  {
-    "id": 34,
-    "query": "Please get me wheat bread and coffee",
-    "query_type": "direct",
-    "expected_items": ["bread", "coffee"]
-  },
-  {
-    "id": 35,
-    "query": "Do you have grapes and granola bars?",
-    "query_type": "direct",
-    "expected_items": ["grape", "granola"]
-  },
-  {
-    "id": 36,
-    "query": "I need ingredients to bake chocolate chip cookies",
-    "query_type": "recipe",
-    "expected_items": ["flour", "eggs", "sugar", "butter"]
-  },
-  {
-    "id": 37,
-    "query": "What do I need to make a vegetable stir fry?",
-    "query_type": "recipe",
-    "expected_items": ["broccoli", "carrot", "lettuce"]
-  },
-  {
-    "id": 38,
-    "query": "I want to make pancakes, what ingredients do you have?",
-    "query_type": "recipe",
-    "expected_items": ["flour", "milk", "eggs"]
-  },
-  {
-    "id": 39,
-    "query": "Help me find everything for a fruit salad",
-    "query_type": "recipe",
-    "expected_items": ["apple", "banana", "orange", "grape"]
-  },
-  {
-    "id": 40,
-    "query": "I need to bake banana bread",
-    "query_type": "recipe",
-    "expected_items": ["banana", "flour", "eggs"]
-  },
-  {
-    "id": 41,
-    "query": "Something for my kids' lunchbox",
-    "query_type": "associative",
-    "expected_items": ["apple", "granola", "yogurt", "juice"]
-  },
-  {
     "id": 42,
-    "query": "I want a healthy breakfast option",
-    "query_type": "associative",
-    "expected_items": ["yogurt", "granola", "apple"]
+    "query": "Where can I find cat litter?",
+    "query_type": "not_in_store",
+    "expected_items": []
   },
   {
     "id": 43,
-    "query": "What do you have for a movie night?",
-    "query_type": "associative",
-    "expected_items": ["popcorn", "soda", "chips", "cookies"]
+    "query": "Do you stock printer ink cartridges?",
+    "query_type": "not_in_store",
+    "expected_items": []
   },
   {
     "id": 44,
-    "query": "I need something for a late night snack",
-    "query_type": "associative",
-    "expected_items": ["chips", "cookies", "nuts"]
+    "query": "Can I buy phone chargers here?",
+    "query_type": "not_in_store",
+    "expected_items": []
   },
   {
     "id": 45,
-    "query": "I'm trying to eat more vegetables this week",
-    "query_type": "associative",
-    "expected_items": ["broccoli", "carrot", "tomato", "lettuce"]
+    "query": "Do you carry fresh flowers?",
+    "query_type": "not_in_store",
+    "expected_items": []
   },
   {
     "id": 46,
-    "query": "Do you stock flour?",
+    "query": "I need bicycle tires.",
     "query_type": "not_in_store",
     "expected_items": []
   },
   {
     "id": 47,
-    "query": "I need to find some eggs",
+    "query": "Do you have motor oil?",
     "query_type": "not_in_store",
     "expected_items": []
   },
   {
     "id": 48,
-    "query": "Where is the butter?",
+    "query": "Where is the pet shampoo section?",
     "query_type": "not_in_store",
     "expected_items": []
   },
   {
     "id": 49,
-    "query": "Can I get 2 litres of milk please?",
-    "query_type": "direct",
-    "expected_items": ["milk"]
+    "query": "Can I get light bulbs?",
+    "query_type": "not_in_store",
+    "expected_items": []
   },
   {
     "id": 50,
-    "query": "I need cola and some mixed nuts",
-    "query_type": "direct",
-    "expected_items": ["soda", "nuts"]
+    "query": "Do you sell office notebooks?",
+    "query_type": "not_in_store",
+    "expected_items": []
+  },
+  {
+    "id": 51,
+    "query": "Hi there!",
+    "query_type": "conversational",
+    "expected_items": []
+  },
+  {
+    "id": 52,
+    "query": "Thanks for your help today.",
+    "query_type": "conversational",
+    "expected_items": []
+  },
+  {
+    "id": 53,
+    "query": "What can you help me with in this store?",
+    "query_type": "conversational",
+    "expected_items": []
+  },
+  {
+    "id": 54,
+    "query": "Can you explain how aisles are organized?",
+    "query_type": "conversational",
+    "expected_items": []
+  },
+  {
+    "id": 55,
+    "query": "Good morning, how are you?",
+    "query_type": "conversational",
+    "expected_items": []
+  },
+  {
+    "id": 56,
+    "query": "I am just browsing right now.",
+    "query_type": "conversational",
+    "expected_items": []
+  },
+  {
+    "id": 57,
+    "query": "Could you repeat your last suggestion?",
+    "query_type": "conversational",
+    "expected_items": []
+  },
+  {
+    "id": 58,
+    "query": "Do you remember what I asked earlier?",
+    "query_type": "conversational",
+    "expected_items": []
+  },
+  {
+    "id": 59,
+    "query": "That's all for now, thank you!",
+    "query_type": "conversational",
+    "expected_items": []
+  },
+  {
+    "id": 60,
+    "query": "Can you assist me when I am ready?",
+    "query_type": "conversational",
+    "expected_items": []
+  },
+  {
+    "id": 61,
+    "query": "I need milk, eggs, and bread for tomorrow morning.",
+    "query_type": "custom",
+    "expected_items": [
+      "milk_1l",
+      "eggs_large",
+      "bread_white"
+    ]
+  },
+  {
+    "id": 62,
+    "query": "Find me chicken nuggets and sparkling water.",
+    "query_type": "custom",
+    "expected_items": [
+      "frozen_nuggets",
+      "sparkling_water"
+    ]
+  },
+  {
+    "id": 63,
+    "query": "Add olive oil, pasta, and tomato sauce to my list.",
+    "query_type": "custom",
+    "expected_items": [
+      "olive_oil",
+      "pasta_spaghetti",
+      "tomato_sauce"
+    ]
+  },
+  {
+    "id": 64,
+    "query": "Where can I pick up paper towels and trash bags?",
+    "query_type": "custom",
+    "expected_items": [
+      "paper_towels",
+      "trash_bags"
+    ]
+  },
+  {
+    "id": 65,
+    "query": "I need toothpaste, shampoo, and body wash.",
+    "query_type": "custom",
+    "expected_items": [
+      "toothpaste",
+      "shampoo",
+      "body_wash"
+    ]
+  },
+  {
+    "id": 66,
+    "query": "Can you locate salmon fillet and lemon?",
+    "query_type": "custom",
+    "expected_items": [
+      "salmon_fillet",
+      "lemon"
+    ]
+  },
+  {
+    "id": 67,
+    "query": "I want frozen berries and plain yogurt.",
+    "query_type": "custom",
+    "expected_items": [
+      "frozen_berries",
+      "yogurt"
+    ]
+  },
+  {
+    "id": 68,
+    "query": "Help me find russet potatoes and yellow onions.",
+    "query_type": "custom",
+    "expected_items": [
+      "potato_russet",
+      "onion_yellow"
+    ]
+  },
+  {
+    "id": 69,
+    "query": "I need wraps, turkey slices, and cream cheese.",
+    "query_type": "custom",
+    "expected_items": [
+      "tortilla_wraps",
+      "turkey_slices",
+      "cream_cheese"
+    ]
+  },
+  {
+    "id": 70,
+    "query": "Get me bottled water and sports drinks.",
+    "query_type": "custom",
+    "expected_items": [
+      "water",
+      "sports_drink"
+    ]
+  },
+  {
+    "id": 71,
+    "query": "Please find cheddar cheese and whole grain crackers.",
+    "query_type": "custom",
+    "expected_items": [
+      "cheese",
+      "crackers"
+    ]
+  },
+  {
+    "id": 72,
+    "query": "Where are dish soap and kitchen sponges?",
+    "query_type": "custom",
+    "expected_items": [
+      "dish_soap",
+      "sponges"
+    ]
+  },
+  {
+    "id": 73,
+    "query": "I want ingredients for simple tacos: ground beef, tomato, and lettuce.",
+    "query_type": "custom",
+    "expected_items": [
+      "ground_beef",
+      "tomato",
+      "lettuce"
+    ]
+  },
+  {
+    "id": 74,
+    "query": "Can I get blueberries, strawberries, and bananas?",
+    "query_type": "custom",
+    "expected_items": [
+      "blueberry",
+      "strawberry",
+      "banana"
+    ]
+  },
+  {
+    "id": 75,
+    "query": "Find tofu and baby spinach for dinner.",
+    "query_type": "custom",
+    "expected_items": [
+      "tofu_firm",
+      "spinach"
+    ]
   }
 ]

@@ -133,6 +133,9 @@ AISLE_CLAUSE_RE = re.compile(r"(?i)\baisles?\b([^.;\n]*)")
 REQUIRED_JSON_KEYS = {"dialogue", "action", "target_aisles"}
 MAX_DIALOGUE_SNIPPET_LENGTH = 120
 ASSISTANT_NAME = "Alex"
+MODE_ALIAS_FOR_PLOTTING = {
+    "direct": "llm_only",
+}
 
 DEFAULT_QUERIES_PATH = os.path.join(REPO_ROOT, "evaluation", "queries.json")
 DEFAULT_OUTPUT_DIR = os.path.join(REPO_ROOT, "evaluation", "results")
@@ -444,6 +447,14 @@ def _append_csv(rows: list[dict], csv_path: str) -> None:
         writer.writerows(rows)
 
 
+def _to_int_bool(value) -> int:
+    """Convert bool-like values to 0/1 for plot-friendly CSV fields."""
+    if isinstance(value, bool):
+        return int(value)
+    text = str(value).strip().lower()
+    return 1 if text in {"1", "true", "yes", "y"} else 0
+
+
 # ---------------------------------------------------------------------------
 # Core evaluation runner
 # ---------------------------------------------------------------------------
@@ -596,8 +607,11 @@ def _run_single_query(
         "target_aisles": str(raw_response.get("target_aisles", [])),
         "dialogue_snippet": raw_response.get("dialogue", "")[:MAX_DIALOGUE_SNIPPET_LENGTH],
         "json_adherent": json_adherent,
+        "json_adherent_int": _to_int_bool(json_adherent),
         "task_success": task_success,
+        "task_success_int": _to_int_bool(task_success),
         "hallucinated": hallucinated,
+        "hallucinated_int": _to_int_bool(hallucinated),
         "hallucinated_aisles": str(hallucinated_aisles),
         "latency_s": latency,
     }
@@ -903,6 +917,129 @@ def _save_summary(summary: dict, output_dir: str, timestamp: str) -> str:
     return summary_path
 
 
+def _canonical_mode_for_plot(mode: str, available_modes: set[str]) -> str:
+    """Resolve display mode aliases (e.g., 'direct' -> 'llm_only') for plotting."""
+    mode = (mode or "").strip()
+    if mode in available_modes:
+        return mode
+    alias = MODE_ALIAS_FOR_PLOTTING.get(mode, mode)
+    if alias in available_modes:
+        return alias
+    return mode
+
+
+def _float_or_zero(value) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def plot_mode_comparison(
+    results_csv_path: str,
+    output_image_path: str,
+    modes: list[str] | None = None,
+) -> str | None:
+    """Create a mode-comparison bar plot from a results CSV."""
+    if modes is None:
+        modes = ["direct", "presearch", "semantic"]
+    if not os.path.isfile(results_csv_path):
+        return None
+
+    rows = []
+    with open(results_csv_path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            rows.append(row)
+    if not rows:
+        return None
+
+    available_modes = {r.get("mode", "").strip() for r in rows if r.get("mode")}
+    if not available_modes:
+        return None
+
+    selected_modes = []
+    for mode in modes:
+        canonical = _canonical_mode_for_plot(mode, available_modes)
+        if canonical in available_modes and (mode, canonical) not in selected_modes:
+            selected_modes.append((mode, canonical))
+
+    if not selected_modes:
+        return None
+
+    metrics_by_mode = []
+    labels = []
+    for display_mode, actual_mode in selected_modes:
+        mode_rows = [r for r in rows if r.get("mode", "").strip() == actual_mode]
+        if not mode_rows:
+            continue
+
+        success_vals = []
+        hallucinated_vals = []
+        json_vals = []
+        latencies = []
+        for r in mode_rows:
+            success_raw = r.get("task_success_int", r.get("task_success", "0"))
+            hall_raw = r.get("hallucinated_int", r.get("hallucinated", "0"))
+            json_raw = r.get("json_adherent_int", r.get("json_adherent", "0"))
+            success_vals.append(_to_int_bool(success_raw))
+            hallucinated_vals.append(_to_int_bool(hall_raw))
+            json_vals.append(_to_int_bool(json_raw))
+            latencies.append(_float_or_zero(r.get("latency_s")))
+
+        total = len(mode_rows)
+        metrics_by_mode.append(
+            {
+                "success_rate": (_mean(success_vals) * 100) if total else 0.0,
+                "hallucination_rate": (_mean(hallucinated_vals) * 100) if total else 0.0,
+                "json_rate": (_mean(json_vals) * 100) if total else 0.0,
+                "latency_mean": _mean(latencies),
+            }
+        )
+        labels.append(display_mode)
+
+    if not metrics_by_mode:
+        return None
+
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        return None
+
+    os.makedirs(os.path.dirname(output_image_path), exist_ok=True)
+    x = list(range(len(labels)))
+    width = 0.2
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+
+    success_rates = [m["success_rate"] for m in metrics_by_mode]
+    hallucination_rates = [m["hallucination_rate"] for m in metrics_by_mode]
+    json_rates = [m["json_rate"] for m in metrics_by_mode]
+    latency_means = [m["latency_mean"] for m in metrics_by_mode]
+
+    axes[0].bar([i - width for i in x], success_rates, width=width, label="Success %")
+    axes[0].bar(x, hallucination_rates, width=width, label="Hallucination %")
+    axes[0].bar([i + width for i in x], json_rates, width=width, label="JSON %")
+    axes[0].set_xticks(x)
+    axes[0].set_xticklabels(labels)
+    axes[0].set_ylim(0, 100)
+    axes[0].set_ylabel("Rate (%)")
+    axes[0].set_title("Evaluation Rates by Mode")
+    axes[0].legend()
+
+    axes[1].bar(x, latency_means, width=0.55, color="#4C78A8")
+    axes[1].set_xticks(x)
+    axes[1].set_xticklabels(labels)
+    axes[1].set_ylabel("Mean latency (s)")
+    axes[1].set_title("Latency by Mode")
+
+    fig.suptitle(f"Mode Comparison ({os.path.basename(results_csv_path)})")
+    fig.tight_layout()
+    fig.savefig(output_image_path, dpi=150)
+    plt.close(fig)
+    return output_image_path
+
+
 # ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
@@ -981,6 +1118,28 @@ def _parse_args() -> argparse.Namespace:
             "Path for the structured run log (.txt).  "
             "Defaults to <output>/run_<timestamp>.log when not specified.  "
             "Pass 'none' to disable file logging entirely."
+        ),
+    )
+    parser.add_argument(
+        "--plot",
+        action="store_true",
+        help="Generate a mode-comparison plot from a results CSV after evaluation.",
+    )
+    parser.add_argument(
+        "--plot_csv",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Path to results CSV used for plotting. Defaults to <output>/results.csv "
+            "when --plot is set."
+        ),
+    )
+    parser.add_argument(
+        "--plot_modes",
+        default="direct,presearch,semantic",
+        help=(
+            "Comma-separated mode labels to compare in the plot. "
+            "Supports aliases like 'direct' (mapped to llm_only in existing CSVs)."
         ),
     )
     return parser.parse_args()
@@ -1102,6 +1261,21 @@ def main() -> int:
     print(f"\n  Results CSV  → {csv_path}")
     print(f"  Rolling CSV  → {resume_csv}")
     print(f"  Summary file → {summary_path}")
+
+    if args.plot:
+        plot_source_csv = args.plot_csv or resume_csv
+        plot_modes = [m.strip() for m in (args.plot_modes or "").split(",") if m.strip()]
+        plot_path = os.path.join(args.output, f"mode_comparison_{timestamp}.png")
+        generated = plot_mode_comparison(
+            results_csv_path=plot_source_csv,
+            output_image_path=plot_path,
+            modes=plot_modes,
+        )
+        if generated:
+            print(f"  Plot file    → {generated}")
+        else:
+            print("  Plot file    → [not generated: missing CSV data or matplotlib]")
+
     if log_path:
         print(f"  Run log      → {log_path}")
     print()
