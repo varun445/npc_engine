@@ -257,6 +257,7 @@ def _format_search_observations(tool_observations, customer_query=""):
         grounded_aisles — unique aisle numbers extracted from FOUND lines
     """
     found_lines = []
+    seen_found_lines = set()
     not_found_names = []
     grounded_aisles = []
     stopwords = set(getattr(Inventory, "_SEMANTIC_STOPWORDS", set()))
@@ -318,7 +319,12 @@ def _format_search_observations(tool_observations, customer_query=""):
 
                     selected.sort(key=lambda c: (c["overlap"], c["score"]), reverse=True)
                     for c in selected:
-                        found_lines.append(f"{term}: {c['name']} (Aisle {c['aisle']})")
+                        # Semantic retrieval may be anchored on abstract/extracted terms
+                        # (e.g. "flour"), so only surface grounded inventory items in FOUND.
+                        semantic_line = f"{c['name']} (Aisle {c['aisle']})"
+                        if semantic_line not in seen_found_lines:
+                            found_lines.append(semantic_line)
+                            seen_found_lines.add(semantic_line)
                         if c["aisle"] not in grounded_aisles:
                             grounded_aisles.append(c["aisle"])
                 else:
