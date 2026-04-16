@@ -1,0 +1,4 @@
+id,mode,query_type,query,expected_items,product_terms_extracted,action,target_aisles,dialogue_snippet,json_adherent,task_success,hallucinated,hallucinated_aisles,latency_s
+1,presearch,direct,Where can I find milk?,milk,,none,[],How can I help you?,True,False,False,[],0.0
+2,presearch,direct,Do you have cheddar cheese?,cheese,cheddar cheese; cheese,move,[1],I found those items. They are in Aisle(s) 1.,True,True,False,[],0.0
+3,presearch,direct,I need some apples please,apple,apple,move,[3],I found those items. They are in Aisle(s) 3.,True,True,False,[],0.0

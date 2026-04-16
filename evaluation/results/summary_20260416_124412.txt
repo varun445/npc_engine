@@ -1,0 +1,16 @@
+NPC Engine — LLM Pipeline Evaluation Summary
+Generated : 2026-04-16T12:44:12.995037
+
+Total queries        : 3
+Task Success Rate    : 100.0%
+Hallucination Rate   : 0.0%
+JSON Adherence Rate  : 100.0%
+Latency mean (s)     : 0.000
+Latency min  (s)     : 0.000
+Latency p50  (s)     : 0.000
+Latency max  (s)     : 0.000
+
+By query type:
+  Type             Queries   Success   Hallucinated
+  ──────────────────────────────────────────────────
+  direct                 3    100.0%           0.0%
