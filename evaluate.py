@@ -710,16 +710,8 @@ def _run_single_query(
             observation = inventory.search_inventory(product_terms)
             tool_observations.append(observation)
     elif mode == "semantic":
-        semantic_profiles = {
-            "direct": {"top_k": 3, "min_score": 0.30},
-            "not_in_store": {"top_k": 4, "min_score": 0.30},
-            "recipe": {"top_k": 6, "min_score": 0.18},
-            "associative": {"top_k": 6, "min_score": 0.20},
-            "conversational": {"top_k": 0, "min_score": 1.00},
-        }
-        profile = semantic_profiles.get(query_type_key, {"top_k": 5, "min_score": 0.24})
-        semantic_profile_top_k = int(profile["top_k"])
-        semantic_profile_min_score = float(profile["min_score"])
+        semantic_profile_top_k = 5
+        semantic_profile_min_score = 0.15
 
         # Semantic mode (2-step):
         # 1) run product/recipe extraction first (same intent extraction as presearch),
@@ -735,24 +727,21 @@ def _run_single_query(
             if product_terms:
                 extraction_source = "semantic_terms_fallback"
 
-        if semantic_profile_top_k <= 0:
-            tool_observations = []
-        else:
-            observation = semantic_search_fn(
-                query,
-                inventory,
-                top_k=semantic_profile_top_k,
-                query_terms=product_terms,
-                min_score=semantic_profile_min_score,
-            )
-            tool_observations = [observation]
+        observation = semantic_search_fn(
+            query,
+            inventory,
+            top_k=semantic_profile_top_k,
+            query_terms=product_terms,
+            min_score=semantic_profile_min_score,
+        )
+        tool_observations = [observation]
         # Log intermediate semantic search result
         try:
             from engine.llm_client import log_step
             log_step(
-                f"[SEMANTIC PROFILE] type={query_type_key} top_k={semantic_profile_top_k} min_score={semantic_profile_min_score:.2f}\n"
+                f"[SEMANTIC PROFILE] top_k={semantic_profile_top_k} min_score={semantic_profile_min_score:.2f}\n"
                 f"[SEMANTIC TERMS  ] extracted={product_terms}\n"
-                f"[SEMANTIC OBS    ] {tool_observations[0] if tool_observations else '(no retrieval: conversational profile)'}\n"
+                f"[SEMANTIC OBS    ] {tool_observations[0]}\n"
             )
         except Exception:
             pass

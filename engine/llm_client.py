@@ -12,9 +12,9 @@ from models.inventory import SEARCH_RESULTS_PREFIX, Inventory
 # etc.) is never printed — only the text "response" field is shown.
 DEBUG = True
 # Keep lower threshold when lexical overlap exists; use stricter gates without overlap.
-MIN_SCORE_WITH_QUERY_OVERLAP = 0.28
-MIN_SCORE_NO_OVERLAP = 0.70
-HIGH_CONFIDENCE_FALLBACK_SCORE = 0.88
+MIN_SCORE_WITH_QUERY_OVERLAP = 0.22
+MIN_SCORE_NO_OVERLAP = 0.55
+HIGH_CONFIDENCE_FALLBACK_SCORE = 0.80
 
 # ---------------------------------------------------------------------------
 # Structured log file (optional — configured via setup_log_file).
