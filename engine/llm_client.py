@@ -12,9 +12,9 @@ from models.inventory import SEARCH_RESULTS_PREFIX, Inventory
 # etc.) is never printed — only the text "response" field is shown.
 DEBUG = True
 # Keep lower threshold when lexical overlap exists; use stricter gates without overlap.
-MIN_SCORE_WITH_QUERY_OVERLAP = 0.22
-MIN_SCORE_NO_OVERLAP = 0.55
-HIGH_CONFIDENCE_FALLBACK_SCORE = 0.80
+MIN_SCORE_WITH_QUERY_OVERLAP = 0.28
+MIN_SCORE_NO_OVERLAP = 0.70
+HIGH_CONFIDENCE_FALLBACK_SCORE = 0.88
 
 # ---------------------------------------------------------------------------
 # Structured log file (optional — configured via setup_log_file).
@@ -231,6 +231,7 @@ def extract_product_terms(customer_query):
     prompt = f"""Your job is to extract individual grocery product names from a customer query.
 
 Rules:
+- If the customer asks for a specific product's availability/location (e.g. "Where is milk?", "Do you sell croissants?"), return only those explicitly requested products. Do NOT expand to recipe ingredients for these direct product queries.
 - If the customer mentions a recipe or dish (e.g. "cake", "pasta", "salad"), list the common ingredients for that recipe as individual product names.
 - If the customer mentions specific products, list each product separately.
 - If the query is a greeting or contains no product references, return an empty list.

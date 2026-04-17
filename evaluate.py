@@ -231,7 +231,11 @@ def _mock_generate_response(
 
 
 def _mock_semantic_search(
-    query: str, inventory: Inventory, top_k: int = 5, query_terms: list[str] | None = None
+    query: str,
+    inventory: Inventory,
+    top_k: int = 5,
+    query_terms: list[str] | None = None,
+    min_score: float = 0.15,
 ) -> str:
     """Deterministic semantic-like retrieval for --mock runs."""
     query_lower = (query or "").lower()
@@ -257,6 +261,7 @@ def _mock_semantic_search(
     if "snack" in query_lower:
         semantic_terms.extend(_terms_from_category("snacks"))
 
+    _ = min_score  # parity with live semantic_search_inventory signature
     keyword_terms = query_terms if query_terms else _mock_extract_product_terms(query)
     semantic_terms.extend(keyword_terms)
 
@@ -304,6 +309,51 @@ def _mock_semantic_search(
     if not matches_with_aisle:
         return f"Search Results: {query}: not found in store inventory"
     return f"Search Results: {query}: {', '.join(matches_with_aisle)}"
+
+
+def _extract_deterministic_terms(query: str, inventory: Inventory, max_terms: int = 8) -> list[str]:
+    """Extract lexical product terms from query text without an LLM call."""
+    query_lower = (query or "").lower().strip()
+    if not query_lower:
+        return []
+
+    terms: list[str] = []
+    seen = set()
+    stopwords = set(getattr(Inventory, "_SEMANTIC_STOPWORDS", set()))
+
+    def _add(term: str) -> None:
+        key = (term or "").strip().lower()
+        if not key or key in seen:
+            return
+        seen.add(key)
+        terms.append(key)
+
+    # 1) Exact product-name phrase match from inventory surface form.
+    for products in inventory.products.values():
+        for product in products:
+            clean_name = re.sub(r"[^a-z0-9\s]", " ", product["name"].lower())
+            clean_name = re.sub(r"\s+", " ", clean_name).strip()
+            if clean_name and clean_name in query_lower:
+                _add(clean_name)
+            pid = str(product["id"]).strip().lower()
+            if pid and pid in query_lower:
+                _add(pid)
+
+    # 2) Token overlap against inventory id/name tokens.
+    inventory_tokens = set()
+    for products in inventory.products.values():
+        for product in products:
+            inventory_tokens.update(re.findall(r"[a-z0-9]+", str(product["id"]).lower()))
+            inventory_tokens.update(re.findall(r"[a-z0-9]+", str(product["name"]).lower()))
+    for token in re.findall(r"[a-z0-9]+", query_lower):
+        if len(token) <= 2 or token in stopwords:
+            continue
+        if token in inventory_tokens:
+            _add(token)
+        if len(terms) >= max_terms:
+            break
+
+    return terms[:max_terms]
 
 
 # ---------------------------------------------------------------------------
@@ -605,6 +655,7 @@ def _run_single_query(
     qid = item["id"]
     query = item["query"]
     query_type = item.get("query_type", "unknown")
+    query_type_key = str(query_type).strip().lower()
     expected_items = item.get("expected_items", [])
 
     if verbose:
@@ -628,9 +679,30 @@ def _run_single_query(
     # ── Pipeline timing start ─────────────────────────────────────────────
     t_start = time.perf_counter()
 
+    extraction_source = "none"
+    llm_extraction_empty = False
+    semantic_profile_top_k = ""
+    semantic_profile_min_score = ""
+
     if mode == "presearch":
         # Step 1 — extract product terms from the query
         product_terms = extract_fn(query)
+        if product_terms:
+            extraction_source = "llm_extract"
+        else:
+            llm_extraction_empty = True
+
+        # Fallback A — deterministic lexical term extraction (no LLM).
+        if not product_terms:
+            product_terms = _extract_deterministic_terms(query, inventory, max_terms=8)
+            if product_terms:
+                extraction_source = "deterministic_terms"
+
+        # Fallback B — broader semantic query-term extraction.
+        if not product_terms:
+            product_terms = inventory.extract_semantic_query_terms(query, max_terms=12)
+            if product_terms:
+                extraction_source = "semantic_terms_fallback"
 
         # Step 2 — deterministic inventory search (the "pre-search hook")
         tool_observations: list[str] = []
@@ -638,6 +710,17 @@ def _run_single_query(
             observation = inventory.search_inventory(product_terms)
             tool_observations.append(observation)
     elif mode == "semantic":
+        semantic_profiles = {
+            "direct": {"top_k": 3, "min_score": 0.30},
+            "not_in_store": {"top_k": 4, "min_score": 0.30},
+            "recipe": {"top_k": 6, "min_score": 0.18},
+            "associative": {"top_k": 6, "min_score": 0.20},
+            "conversational": {"top_k": 0, "min_score": 1.00},
+        }
+        profile = semantic_profiles.get(query_type_key, {"top_k": 5, "min_score": 0.24})
+        semantic_profile_top_k = int(profile["top_k"])
+        semantic_profile_min_score = float(profile["min_score"])
+
         # Semantic mode (2-step):
         # 1) run product/recipe extraction first (same intent extraction as presearch),
         # 2) run semantic retrieval over extracted terms; fall back to semantic query terms
@@ -645,16 +728,31 @@ def _run_single_query(
         extracted_terms = extract_fn(query)
         if extracted_terms:
             product_terms = extracted_terms
+            extraction_source = "llm_extract"
         else:
+            llm_extraction_empty = True
             product_terms = inventory.extract_semantic_query_terms(query)
-        observation = semantic_search_fn(query, inventory, top_k=5, query_terms=product_terms)
-        tool_observations = [observation]
+            if product_terms:
+                extraction_source = "semantic_terms_fallback"
+
+        if semantic_profile_top_k <= 0:
+            tool_observations = []
+        else:
+            observation = semantic_search_fn(
+                query,
+                inventory,
+                top_k=semantic_profile_top_k,
+                query_terms=product_terms,
+                min_score=semantic_profile_min_score,
+            )
+            tool_observations = [observation]
         # Log intermediate semantic search result
         try:
             from engine.llm_client import log_step
             log_step(
-                f"[SEMANTIC TERMS] extracted={product_terms}\n"
-                f"[SEMANTIC OBS  ] {observation}\n"
+                f"[SEMANTIC PROFILE] type={query_type_key} top_k={semantic_profile_top_k} min_score={semantic_profile_min_score:.2f}\n"
+                f"[SEMANTIC TERMS  ] extracted={product_terms}\n"
+                f"[SEMANTIC OBS    ] {tool_observations[0] if tool_observations else '(no retrieval: conversational profile)'}\n"
             )
         except Exception:
             pass
@@ -663,6 +761,10 @@ def _run_single_query(
         product_terms = []
         tool_observations = []
 
+    used_inventory_context_fallback = (
+        (mode == "llm_only") or (mode in {"presearch", "semantic"} and not tool_observations)
+    )
+
     # Step 3 — generate final response (grounded or vanilla depending on mode)
     raw_response = generate_fn(
         ASSISTANT_NAME,
@@ -670,7 +772,7 @@ def _run_single_query(
         inventory_summary,
         [],              # empty memory for independent per-query evaluation
         tool_observations,
-        include_inventory_in_no_search=(mode == "llm_only"),
+        include_inventory_in_no_search=used_inventory_context_fallback,
         retrieval_mode=mode,
     )
 
@@ -688,6 +790,18 @@ def _run_single_query(
         expected_aisles=expected_aisles,
     )
     hallucinated = len(hallucinated_aisles) > 0
+    raw_target_aisles = _normalize_aisle_values(raw_response.get("_raw_target_aisles", []))
+    grounded_target_aisles = _normalize_aisle_values(raw_response.get("target_aisles", []))
+    grounding_drop_count = max(0, len(raw_target_aisles) - len(grounded_target_aisles))
+    retrieval_no_results = (
+        len(tool_observations) == 0
+        or all("not found in store inventory" in (obs or "") for obs in tool_observations)
+    )
+    if hallucinated:
+        raw_removed = any(aisle not in set(grounded_target_aisles) for aisle in raw_target_aisles)
+        hallucination_source = "raw_removed_by_grounding" if raw_removed else "dialogue_or_expected_mismatch"
+    else:
+        hallucination_source = ""
 
     # ── Metric 3: Task Success ────────────────────────────────────────────
     task_success = _is_task_success(
@@ -715,6 +829,16 @@ def _run_single_query(
         "hallucinated": hallucinated,
         "hallucinated_int": _to_int_bool(hallucinated),
         "hallucinated_aisles": str(hallucinated_aisles),
+        "extraction_source": extraction_source,
+        "llm_extraction_empty": llm_extraction_empty,
+        "retrieval_no_results": retrieval_no_results,
+        "used_inventory_context_fallback": used_inventory_context_fallback,
+        "semantic_top_k": semantic_profile_top_k if mode == "semantic" else "",
+        "semantic_min_score": semantic_profile_min_score if mode == "semantic" else "",
+        "raw_target_aisles": str(raw_target_aisles),
+        "grounded_target_aisles": str(grounded_target_aisles),
+        "grounding_drop_count": grounding_drop_count,
+        "hallucination_source": hallucination_source,
         "latency_s": latency,
     }
 
@@ -739,8 +863,8 @@ def _build_pipeline_callables(mock: bool):
     from engine.llm_client import extract_product_terms, generate_shop_assistant_response
     return (
         extract_product_terms,
-        lambda query, inventory, top_k=5, query_terms=None: inventory.semantic_search_inventory(
-            query, top_k=top_k, query_terms=query_terms
+        lambda query, inventory, top_k=5, query_terms=None, min_score=0.15: inventory.semantic_search_inventory(
+            query, top_k=top_k, query_terms=query_terms, min_score=min_score
         ),
         generate_shop_assistant_response,
     )
