@@ -90,6 +90,14 @@ ollama serve
 python main.py
 ```
 
+### Plot evaluation results later (without re-running evaluation)
+```bash
+python plot_results.py --csv evaluation/results/results.csv
+```
+Optional flags:
+- `--output /path/to/plot.png`
+- `--modes direct,presearch,semantic`
+
 ---
 
 ## Controls
