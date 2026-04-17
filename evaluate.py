@@ -130,6 +130,10 @@ VALID_AISLES = set(AISLE_LOCATIONS.values())          # derived from AISLE_LOCAT
 AISLE_REFERENCE_RE = re.compile(r"[Aa]isle\s+(\d+)")  # matches "Aisle N" etc.
 # Captures text after "aisle"/"aisles" so we can extract all referenced numbers.
 AISLE_CLAUSE_RE = re.compile(r"(?i)\baisles?\b([^.;\n]*)")
+AISLE_LIST_PREFIX_RE = re.compile(
+    r"^\s*(?:(?:are|is)\s+)?(?:in\s+)?(\d+(?:\s*(?:,|and|or|&|/)\s*\d+)*)\b",
+    re.IGNORECASE,
+)
 REQUIRED_JSON_KEYS = {"dialogue", "action", "target_aisles"}
 MAX_DIALOGUE_SNIPPET_LENGTH = 120
 ASSISTANT_NAME = "Alex"
@@ -400,7 +404,11 @@ def _find_hallucinated_aisles(response: dict, expected_aisles: set[int] | None =
     # 4. Plural/compound aisle mentions, e.g. "Aisles 1 and 9"
     for m in AISLE_CLAUSE_RE.finditer(dialogue):
         clause = m.group(1) or ""
-        for num_str in re.findall(r"\d+", clause):
+        list_match = AISLE_LIST_PREFIX_RE.search(clause)
+        if not list_match:
+            continue
+        list_segment = list_match.group(1)
+        for num_str in re.findall(r"\d+", list_segment):
             aisle_num = int(num_str)
             if aisle_num not in VALID_AISLES and aisle_num not in invalid:
                 invalid.append(aisle_num)
@@ -432,8 +440,8 @@ def _is_task_success(
     if hallucinated_aisles:
         return False
 
-    action = response.get("action", "none")
-    target_aisles = response.get("target_aisles", [])
+    action = str(response.get("action", "none")).strip().lower()
+    target_aisles = _normalize_aisle_values(response.get("target_aisles", []))
 
     # Determine which of the expected items are actually in stock
     stocked_terms = []
@@ -443,12 +451,46 @@ def _is_task_success(
             if matches:
                 stocked_terms.append(term)
 
+    expected_aisles = _expected_stocked_aisles(expected_items, inventory)
+
     if stocked_terms:
         # At least one expected in-stock item → agent should navigate
-        return action == "move" and len(target_aisles) > 0
+        if action != "move" or len(target_aisles) == 0:
+            return False
+        if any(aisle not in VALID_AISLES for aisle in target_aisles):
+            return False
+        if expected_aisles and not any(aisle in expected_aisles for aisle in target_aisles):
+            return False
+        return True
     else:
         # No in-stock items expected → agent should stay put
-        return action == "none"
+        return action == "none" and len(target_aisles) == 0
+
+
+def _is_json_adherent(response: dict) -> bool:
+    """Return True when output strictly matches the expected JSON schema."""
+    if not isinstance(response, dict):
+        return False
+    if set(response.keys()) != REQUIRED_JSON_KEYS:
+        return False
+
+    dialogue = response.get("dialogue")
+    action = response.get("action")
+    target_aisles = response.get("target_aisles")
+
+    if not isinstance(dialogue, str):
+        return False
+    if not isinstance(action, str):
+        return False
+    if not isinstance(target_aisles, list):
+        return False
+
+    for aisle in target_aisles:
+        try:
+            int(aisle)
+        except (TypeError, ValueError):
+            return False
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -616,9 +658,7 @@ def _run_single_query(
     # ── Pipeline timing end ───────────────────────────────────────────────
 
     # ── Metric 1: JSON Adherence ──────────────────────────────────────────
-    json_adherent = isinstance(raw_response, dict) and REQUIRED_JSON_KEYS.issubset(
-        raw_response.keys()
-    )
+    json_adherent = _is_json_adherent(raw_response)
 
     # ── Metric 2: Hallucination ───────────────────────────────────────────
     expected_aisles = _expected_stocked_aisles(expected_items, inventory)
