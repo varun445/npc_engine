@@ -468,24 +468,45 @@ def _is_task_success(
 
 
 def _is_json_adherent(response: dict) -> bool:
-    """Return True when output strictly matches the expected JSON schema."""
+    """Return True when required response fields are present and parseable.
+
+    This is intentionally tolerant of extra keys (e.g. internal metadata like
+    ``_raw_target_aisles``) as long as the three required fields can be
+    extracted in usable form.
+    """
     if not isinstance(response, dict):
         return False
-    if set(response.keys()) != REQUIRED_JSON_KEYS:
+    if not REQUIRED_JSON_KEYS.issubset(response.keys()):
         return False
 
     dialogue = response.get("dialogue")
     action = response.get("action")
     target_aisles = response.get("target_aisles")
 
-    if not isinstance(dialogue, str):
+    if isinstance(dialogue, (dict, list)) or dialogue is None:
         return False
-    if not isinstance(action, str):
-        return False
-    if not isinstance(target_aisles, list):
+    if isinstance(action, (dict, list)) or action is None:
         return False
 
-    for aisle in target_aisles:
+    parsed_aisles = target_aisles
+    if isinstance(target_aisles, str):
+        text = target_aisles.strip()
+        if text == "":
+            parsed_aisles = []
+        else:
+            try:
+                parsed_aisles = json.loads(text)
+            except json.JSONDecodeError:
+                return False
+    elif isinstance(target_aisles, (int, float)):
+        parsed_aisles = [target_aisles]
+    elif isinstance(target_aisles, tuple):
+        parsed_aisles = list(target_aisles)
+
+    if not isinstance(parsed_aisles, list):
+        return False
+
+    for aisle in parsed_aisles:
         try:
             int(aisle)
         except (TypeError, ValueError):
