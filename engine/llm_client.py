@@ -182,7 +182,7 @@ def query_llm(prompt):
         response = requests.post(
             "http://localhost:11434/api/generate",
             json={
-                "model": "ministral-3:8b-cloud",
+                "model": "rnj-1:8b-cloud",
                 "prompt": prompt,
                 "stream": False,
             },
@@ -231,6 +231,7 @@ def extract_product_terms(customer_query):
     prompt = f"""Your job is to extract individual grocery product names from a customer query.
 
 Rules:
+- If the customer asks for a specific product's availability/location (e.g. "Where is milk?", "Do you sell croissants?"), return only those explicitly requested products. Do NOT expand to recipe ingredients for these direct product queries.
 - If the customer mentions a recipe or dish (e.g. "cake", "pasta", "salad"), list the common ingredients for that recipe as individual product names.
 - If the customer mentions specific products, list each product separately.
 - If the query is a greeting or contains no product references, return an empty list.
