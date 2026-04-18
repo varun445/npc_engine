@@ -4,7 +4,7 @@ Generated : 2026-04-17T13:18:31.091752
 Total queries        : 225
 Task Success Rate    : 95.6%
 Hallucination Rate   : 0.0%
-JSON Adherence Rate  : 0.0%
+JSON Adherence Rate  : 100.0%
 Latency mean (s)     : 4.212
 Latency min  (s)     : 1.213
 Latency p50  (s)     : 2.659
