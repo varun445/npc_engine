@@ -81,6 +81,10 @@ class Game:
 
         # Dispatch NPC action (e.g., move to one or more target aisles, or checkout)
         if self.ui_state.npc_action == "checkout":
+            # Decrement stock for each purchased item before clearing the cart.
+            inventory = self.input_handler.inventory
+            for item in self.world.player_cart:
+                inventory.decrement_stock(item["id"], item.get("quantity", 1))
             self.world.clear_player_cart()
             # Clear cashier memory so the receipt doesn't leak into future conversations.
             if npc:
